@@ -41,9 +41,11 @@ jospabloh/acacia-app-standard. Status:
       links to trial and support, dark-theme correct.
 
 - [ ] Module 11 — Deploy discipline: `base44.app.json` + `npm run deploy`
-      (refuses `--app-id`), `deploy:entities` behind a typed confirmation, and
+      (refuses `--app-id`), `deploy:site` for the frontend (merging to `main`
+      deploys nothing), `deploy:entities` behind a typed confirmation, and
       `validate:functions` in lint keeping endpoints under 40 (Base44 caps at
-      50). Run `npm run functions:audit` before consolidating anything.
+      50). Run `npm run functions:audit` before consolidating anything, and
+      verify every deploy by reading the served file, not by a hash or a merge.
 
 Last audited against the standard: <date> — <what changed / what's still open>
 ```

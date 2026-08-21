@@ -141,7 +141,12 @@ precondition is actually met before the thing that depends on it ships.
 
 ## FlowFin & StockFlow — Base44 functions don't auto-deploy from GitHub
 
-Merging a PR to `main` redeploys the **frontend** only. Everything under the
+> **Correction (2026-08-21):** this entry used to open with "merging a PR to
+> `main` redeploys the **frontend** only." The second half was right; the first
+> half was not. Merging redeploys *nothing* — see the next entry, where that
+> false half kept a fix out of production for five days.
+
+Everything under the
 Base44 functions directory needs a separate, manual
 `npx base44 functions deploy --app-id <id> --force`. Skipping this step means
 a redeployed frontend calls endpoints that don't exist in the backend yet —
@@ -199,3 +204,40 @@ Lessons, now enforced in every app repo:
    An audit that only greps the repo will confidently propose deleting them.
    `npm run functions:audit` prints what the repo can prove and flags the rest
    as needing a dashboard check, rather than guessing.
+
+## FlowFin — a merged, CI-green fix that was never served (2026-08-21)
+
+Mochi Family reported that FlowFin's setup tutorial kept reappearing after they
+pressed **"Omitir el tutorial por completo"**. The bug was found (a race in
+`useTutorialState.js`'s persist queue that could drop the terminal `skipped`
+write), fixed, reviewed, merged to `main` as `5922916`, and CI went green.
+
+**Five days later the app was still serving the unfixed file.** Read straight
+out of the running app: `src/hooks/useTutorialState.js` was 352 lines with zero
+occurrences of any identifier the fix introduced, and `enqueuePersist` still
+carried the exact `workerPromiseRef` gate that causes the race. The user kept
+hitting the bug the whole time, with the fix sitting in `main`.
+
+Nothing was wrong with the code. The cause was a sentence in the repo's own
+`CLAUDE.md` — and in the entry above — asserting that merging to `main`
+redeploys the frontend. It does not. Nobody ran a site deploy because the
+documentation said one wasn't needed.
+
+**The detail that makes this hard to catch:** the app's checkpoint reports a
+`git_commit_hash` equal to `main`'s HEAD *even when the tree being served is
+behind*. Base44 mirrors the commits into its metadata, but what gets built and
+served is the app's working tree, and the two can diverge. A hash that matches
+is not evidence the fix is live.
+
+Lessons:
+
+1. **Verify a deploy by content, not by hash or by a green merge.** Read the
+   deployed file and grep for an identifier that exists *only* in the fix.
+   `wc -l` against the repo's own line count is a decent second signal.
+2. **Every manual deploy step gets a command.** `npm run deploy:site` now
+   exists in all nine app repos, next to `deploy` and `deploy:entities`. The
+   2026-08-21 incident above and this one are the same shape: a step that
+   depended on somebody remembering it.
+3. **A user-reported bug is not closed when the PR merges.** It is closed when
+   the thing the user touches behaves differently. For this portfolio that is
+   always at least one deploy past the merge.

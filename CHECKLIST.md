@@ -47,5 +47,12 @@ jospabloh/acacia-app-standard. Status:
       50). Run `npm run functions:audit` before consolidating anything, and
       verify every deploy by reading the served file, not by a hash or a merge.
 
+- [ ] Module 12 — Theme control: the shared corner switcher from
+      `shared/theme/`, offering claro / oscuro / sistema, copied in unchanged
+      and rendered once inside the theme provider. Preference stored as
+      'light' | 'dark' | 'system' (never the resolved colour), pre-mount script
+      in index.html so there is no flash, and no other theme control left in
+      the app. An app that ships only one theme says so, with its reason, here.
+
 Last audited against the standard: <date> — <what changed / what's still open>
 ```

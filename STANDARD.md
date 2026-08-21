@@ -297,6 +297,51 @@ company. Concretely, "pro" means:
 
 ---
 
+## 12. Theme control — light, dark, and the device
+
+Every app offers all three, from the same control, in the same place.
+
+**Three modes, not two.** What gets stored is the operator's *preference* —
+`'light' | 'dark' | 'system'` — never the resolved colour. `system` keeps
+resolving against `prefers-color-scheme` for as long as it is selected, so a
+phone that turns dark at sunset turns the app dark with it. A switcher that
+stored the resolved colour would silently throw away the choice.
+
+**One control, in a corner.** A small circle pinned to a screen corner showing
+the mode in force; pressing it grows the circle sideways into a three-slot
+track whose indicator slides to the chosen slot. Three states get three
+physical positions, which is the thing a sun/moon toggle structurally cannot do
+once "follow the device" is an option. The canonical implementation lives in
+[`shared/theme/`](shared/theme/) — copy it, do not re-implement it, and do not
+edit an app's copy in place.
+
+**It is the only theme control in the app.** Sidebar toggles, header buttons and
+command-palette entries that write the theme come out when the switcher goes in:
+two writers of the theme class fight over it, and the older ones can only ever
+reach two of the three modes. A command palette may keep *three* commands (one
+per mode) — that is a keyboard shortcut to the same state, not a second writer
+of a different model.
+
+**No flash of the wrong theme.** `index.html` carries a pre-mount script that
+resolves and applies the theme before the app mounts, using the same storage key
+and the same three values as the provider. Both sides carry a comment pointing
+at the other; they are kept in sync by hand.
+
+**The dark palette has to actually be finished.** Wiring a switcher onto an app
+whose screens are half hardcoded light colours ships a broken mode, which is
+worse than not offering one. Before turning the control on: every surface comes
+from a semantic token, and the colours that legitimately cannot (status chips —
+red / amber / emerald washes) carry an explicit dark counterpart.
+
+**An app may decline dark or light**, but only on a stated design ground, in its
+own `CLAUDE.md`, naming the constraint — brand assets that only sit on one
+ground, a physical use context. `kitchops` is the standing example: photographic
+brand assets and copper that reads as mud on white, used in a kitchen at night.
+An app that declines ships no switcher at all rather than a control with one
+working option.
+
+---
+
 ## Onboarding checklist for a brand-new app
 
 1. Pick the backend kind and confirm an adapter exists in Mission Control
@@ -318,7 +363,9 @@ company. Concretely, "pro" means:
    Mission Control's `apps` table (`npm run onboard:base44 -- <repoPath> --dry`
    to preview).
 10. Build the login page to the Module 10 bar.
-11. Copy `CHECKLIST.md` from this repo into the new app's `CLAUDE.md`.
+11. Copy the theme switcher in from [`shared/theme/`](shared/theme/) (Module 12)
+    and delete any other theme control.
+12. Copy `CHECKLIST.md` from this repo into the new app's `CLAUDE.md`.
 
 See [`CHECKLIST.md`](CHECKLIST.md) for the compact, copy-pasteable version of
 this list, and [`docs/incidents.md`](docs/incidents.md) for the full postmortems

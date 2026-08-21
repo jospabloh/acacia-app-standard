@@ -334,7 +334,7 @@ prune phase only runs after a clean deploy, a half-applied deploy leaves stale
 remote functions occupying the slots needed to fix it. See
 [`docs/incidents.md`](docs/incidents.md), 2026-08-21.
 
-Every app repo must carry these four, and they are cheap enough that there is
+Every app repo must carry these five, and they are cheap enough that there is
 no reason not to:
 
 - **`base44.app.json`** — `{ name, appId, maxFunctions }`. The app id lives
@@ -344,12 +344,33 @@ no reason not to:
   `--app-id` argument**, so the source directory and the target app cannot
   disagree. Hand-running `npx base44 functions deploy --app-id <id>` is what
   pushed one app's backend into four others.
+- **`npm run deploy:site`** — the frontend. **Merging to `main` deploys
+  nothing**, neither functions nor site; that was believed otherwise for
+  months, and it kept a merged, CI-green FlowFin fix out of production for five
+  days while the user who reported the bug kept hitting it. Separate from
+  `deploy` so a UI change doesn't re-walk 45 functions, and so the step that
+  went missing is the one you run on purpose.
 - **`npm run deploy:entities`** — separate on purpose, because `entities push`
   **deletes every remote entity absent locally**. It prints the app name and
   the full entity list, then requires the operator to type the app's name.
 - **`npm run validate:functions`**, wired into `npm run lint` — fails above
   `maxFunctions` (default **40**). The 10-endpoint margin under Base44's 50 is
   the point: it means adding a function is never an emergency.
+
+**Verify a deploy by content, never by a hash or a green merge.** The app's
+checkpoint reports a `git_commit_hash` equal to `main`'s HEAD *even when the
+tree being served is behind* — Base44 mirrors the commits into its metadata,
+but what gets built and served is the app's own working tree. Read the
+deployed file and grep for an identifier that exists only in the change:
+
+```bash
+wc -l src/<archivo-que-cambiaste>
+grep -c "<identificador que SOLO existe en el fix>" src/<archivo>
+```
+
+A user-reported bug is closed when the thing the user touches behaves
+differently — for this portfolio that is always at least one deploy past the
+merge.
 
 **Counting rule:** a function is any directory containing `entry.ts`/`entry.js`,
 at any depth — its name is its full path, so nesting does not reduce the count.

@@ -153,3 +153,49 @@ until someone deploys it.
 Lesson: **"committed" and "deployed" are different claims for this whole
 portfolio's backend of choice.** Never report a Base44-side change as done
 without confirming the deploy step actually ran.
+
+## Portfolio — deploying the wrong repo into four apps (2026-08-21)
+
+A `git pull` failed in `flowfin` (a dirty `package-lock.json`), the shell
+stayed in that directory, and the next six deploy commands ran from there.
+Each one named the right `--app-id` but took its source from the **current
+directory**, so FlowFin's `base44/` was pushed into puntos, radar, stockflow
+and ctrlhq. Nothing anywhere checks that the directory and the target app
+agree.
+
+Damage: same-named functions were overwritten in the receiving apps —
+including `acaciaControl`, the Mission Control bridge, in three of them. In
+radar, `entities push` completed and **deleted the entire data model**
+(`Company`, `Employee`, `AttendanceRecord`, `PTORequest`, …), replacing it
+with FlowFin's 36 entities. No records were lost only because radar had no
+tenants yet: Base44 refuses to drop a schema that holds rows, which is also
+what saved puntos — its push aborted on `Cannot delete entity schema for
+'LicenseEvent': it has existing records`.
+
+Recovery exposed a second trap. `--force` prunes remote functions absent
+locally, but **only after a deploy that finished cleanly**. Three of the four
+apps were now over Base44's 50-function cap, so the deploy errored partway,
+the CLI exited non-zero, and the prune phase never ran — leaving the foreign
+functions squatting slots and blocking the very deploy that would remove
+them. Breaking the loop means temporarily moving the *new* functions out of
+the repo, deploying so the prune runs, then moving them back.
+
+Lessons, now enforced in every app repo:
+
+1. **Bind the app id to the directory, not to the operator's memory.**
+   `base44.app.json` holds the id; `npm run deploy` reads it and *refuses* an
+   `--app-id` from argv. The mismatch becomes unrepresentable.
+2. **Show the blast radius before a destructive push.** `entities push`
+   deletes every remote entity absent locally. The wrapper prints the app name
+   and the entity list, then requires the operator to type the app's name.
+   Standing in a radar deploy and reading "36 entities of FlowFin" is the stop
+   sign that did not exist.
+3. **Keep headroom under the cap.** `validate:functions` fails the build above
+   40 endpoints (Base44 cuts at 50). The margin is what stops a routine deploy
+   from turning into a half-applied one.
+4. **"No caller in the repo" does not mean dead.** Both flowfin's and
+   stockflow's own reorg docs carry a "left untouched — invoked out-of-band"
+   list: entity hooks, dashboard crons, agent `tool_configs`, webhook URLs.
+   An audit that only greps the repo will confidently propose deleting them.
+   `npm run functions:audit` prints what the repo can prove and flags the rest
+   as needing a dashboard check, rather than guessing.

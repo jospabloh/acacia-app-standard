@@ -323,3 +323,49 @@ company. Concretely, "pro" means:
 See [`CHECKLIST.md`](CHECKLIST.md) for the compact, copy-pasteable version of
 this list, and [`docs/incidents.md`](docs/incidents.md) for the full postmortems
 this standard was distilled from.
+
+---
+
+## 11. Deploy discipline & the endpoint budget
+
+Base44 caps an app at **50 backend functions**. That cap is not a soft limit:
+crossing it makes `functions deploy` fail *partway*, and because the CLI's
+prune phase only runs after a clean deploy, a half-applied deploy leaves stale
+remote functions occupying the slots needed to fix it. See
+[`docs/incidents.md`](docs/incidents.md), 2026-08-21.
+
+Every app repo must carry these four, and they are cheap enough that there is
+no reason not to:
+
+- **`base44.app.json`** — `{ name, appId, maxFunctions }`. The app id lives
+  in the repo, next to the code it deploys.
+- **`npm run deploy`** (`scripts/base44-deploy.mjs`) — the only sanctioned
+  deploy path. It reads the id from `base44.app.json` and **refuses an
+  `--app-id` argument**, so the source directory and the target app cannot
+  disagree. Hand-running `npx base44 functions deploy --app-id <id>` is what
+  pushed one app's backend into four others.
+- **`npm run deploy:entities`** — separate on purpose, because `entities push`
+  **deletes every remote entity absent locally**. It prints the app name and
+  the full entity list, then requires the operator to type the app's name.
+- **`npm run validate:functions`**, wired into `npm run lint` — fails above
+  `maxFunctions` (default **40**). The 10-endpoint margin under Base44's 50 is
+  the point: it means adding a function is never an emergency.
+
+**Counting rule:** a function is any directory containing `entry.ts`/`entry.js`,
+at any depth — its name is its full path, so nesting does not reduce the count.
+The only way down is a **router**: one endpoint that dispatches on an `action`
+field to handler modules under `handlers/`, which are bundled with the router
+and cost no slots. FlowFin went 94 → 48 this way; StockFlow's 21 routers absorb
+99 handlers. Both repos document the mapping in
+`docs/BACKEND_FUNCTION_LIMIT_REORG.md`.
+
+**Before consolidating anything, run `npm run functions:audit`.** A function
+with no caller in the repo is usually *not* dead — the caller is outside the
+repo, where grep cannot see it: a Base44 entity hook, a dashboard cron, an
+agent `tool_config`, a webhook URL registered with a payment provider.
+Renaming or deleting one breaks it silently, with no compile error and no
+failing test. The audit prints what the repo can prove and flags the rest as
+**REVISAR EN PANEL**; confirm those against `npx base44 functions list` (which
+annotates `(N automation)`) and the Automations panel before touching them.
+Treat any existing "deliberately left untouched" list as a lead, not a fact —
+both apps' lists had gone stale.

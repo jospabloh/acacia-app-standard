@@ -271,8 +271,7 @@ precondition is actually met before the thing that depends on it ships.
 
 > **Correction (2026-08-21):** this entry used to open with "merging a PR to
 > `main` redeploys the **frontend** only." The second half was right; the first
-> half was not. Merging redeploys *nothing* — see the next entry, where that
-> false half kept a fix out of production for five days.
+> half was not. Merging redeploys *nothing* — see the next entry.
 
 Everything under the
 Base44 functions directory needs a separate, manual
@@ -333,18 +332,30 @@ Lessons, now enforced in every app repo:
    `npm run functions:audit` prints what the repo can prove and flags the rest
    as needing a dashboard check, rather than guessing.
 
-## FlowFin — a merged, CI-green fix that was never served (2026-08-21)
+## FlowFin — merging deploys nothing, frontend included (2026-08-21)
 
-Mochi Family reported that FlowFin's setup tutorial kept reappearing after they
-pressed **"Omitir el tutorial por completo"**. The bug was found (a race in
-`useTutorialState.js`'s persist queue that could drop the terminal `skipped`
-write), fixed, reviewed, merged to `main` as `5922916`, and CI went green.
+Two findings on the same day, one cheap and one expensive, both the same shape:
+code sitting in `main` that nothing had shipped.
 
-**Five days later the app was still serving the unfixed file.** Read straight
-out of the running app: `src/hooks/useTutorialState.js` was 352 lines with zero
-occurrences of any identifier the fix introduced, and `enqueuePersist` still
-carried the exact `workerPromiseRef` gate that causes the race. The user kept
-hitting the bug the whole time, with the fix sitting in `main`.
+**The expensive one — three days of 404s on the main write path.**
+`guardedEntityWrite` (the Module 3 server-side permission and billing gate)
+landed in `main` on 2026-08-18 together with `src/lib/guardedWrite.js` and 19
+migrated call sites. The frontend was being served and calling it; the backend
+function had never been deployed. Every `Transaction`/`Category`/`Goal`/`Trip`
+write in the app went to an endpoint that did not exist, for three days. Closed
+by a deploy on 2026-08-21.
+
+**The cheap one, which explains why the expensive one was possible.** A fix for
+a user-reported bug (Mochi Family: the setup tutorial kept reappearing after
+pressing "Omitir") was merged to `main` as `5922916` at 17:14 UTC and CI went
+green. **Four hours later the app was still serving the unfixed file** — read
+straight out of the running app, `src/hooks/useTutorialState.js` was 352 lines
+with zero occurrences of any identifier the fix introduced, and
+`enqueuePersist` still carried the exact race the fix removes.
+
+Four hours is a short window only because somebody went and looked. Nothing
+indicates it would have closed on its own, and a fix merged on a Friday stays
+that way until someone notices.
 
 Nothing was wrong with the code. The cause was a sentence in the repo's own
 `CLAUDE.md` — and in the entry above — asserting that merging to `main`

@@ -507,11 +507,13 @@ no reason not to:
   disagree. Hand-running `npx base44 functions deploy --app-id <id>` is what
   pushed one app's backend into four others.
 - **`npm run deploy:site`** — the frontend. **Merging to `main` deploys
-  nothing**, neither functions nor site; that was believed otherwise for
-  months, and it kept a merged, CI-green FlowFin fix out of production for five
-  days while the user who reported the bug kept hitting it. Separate from
-  `deploy` so a UI change doesn't re-walk 45 functions, and so the step that
-  went missing is the one you run on purpose.
+  nothing**, neither functions nor site. That was believed otherwise for
+  months, and it cost FlowFin three days of 404s on its main write path (a
+  server function in `main` since 2026-08-18 that nothing had deployed, called
+  by a frontend that *was* being served) plus a merged, CI-green frontend fix
+  still unserved four hours later. Separate from `deploy` so a UI change
+  doesn't re-walk 45 functions, and so the step that went missing is the one
+  you run on purpose.
 - **`npm run deploy:entities`** — separate on purpose, because `entities push`
   **deletes every remote entity absent locally**. It prints the app name and
   the full entity list, then requires the operator to type the app's name.

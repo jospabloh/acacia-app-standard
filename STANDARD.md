@@ -297,118 +297,6 @@ company. Concretely, "pro" means:
 
 ---
 
-## 12. Theme control — light, dark, and the device
-
-Every app offers all three, from the same control, in the same place.
-
-**Three modes, not two.** What gets stored is the operator's *preference* —
-`'light' | 'dark' | 'system'` — never the resolved colour. `system` keeps
-resolving against `prefers-color-scheme` for as long as it is selected, so a
-phone that turns dark at sunset turns the app dark with it. A switcher that
-stored the resolved colour would silently throw away the choice.
-
-**One control, in a corner.** A small circle pinned to a screen corner showing
-the mode in force; pressing it grows the circle sideways into a three-slot
-track whose indicator slides to the chosen slot. Three states get three
-physical positions, which is the thing a sun/moon toggle structurally cannot do
-once "follow the device" is an option. The canonical implementation lives in
-[`shared/theme/`](shared/theme/) — copy it, do not re-implement it, and do not
-edit an app's copy in place.
-
-**It is the only theme control in the app.** Sidebar toggles, header buttons and
-command-palette entries that write the theme come out when the switcher goes in:
-two writers of the theme class fight over it, and the older ones can only ever
-reach two of the three modes. A command palette may keep *three* commands (one
-per mode) — that is a keyboard shortcut to the same state, not a second writer
-of a different model.
-
-**No flash of the wrong theme.** `index.html` carries a pre-mount script that
-resolves and applies the theme before the app mounts, using the same storage key
-and the same three values as the provider. Both sides carry a comment pointing
-at the other; they are kept in sync by hand.
-
-**The dark palette has to actually be finished.** Wiring a switcher onto an app
-whose screens are half hardcoded light colours ships a broken mode, which is
-worse than not offering one. Before turning the control on: every surface comes
-from a semantic token, and the colours that legitimately cannot (status chips —
-red / amber / emerald washes) carry an explicit dark counterpart.
-
-**An app may decline dark or light**, but only on a stated design ground, in its
-own `CLAUDE.md`, naming the constraint — brand assets that only sit on one
-ground, a physical use context. `kitchops` is the standing example: photographic
-brand assets and copper that reads as mud on white, used in a kitchen at night.
-An app that declines ships no switcher at all rather than a control with one
-working option.
-
-
----
-
-## 13. Live-site smoke test — `npm run test:smoke`
-
-Every app has one, and it checks the **deployed** site rather than a local
-build. That is the point: builds are green, and the failure that actually costs
-days is a change that merged and was never served (Module 11). This is the
-"verify by content, not by a commit hash" rule, automated.
-
-The suite lives in [`shared/smoke/`](shared/smoke/) — `smoke.spec.js` is
-byte-identical in every repo, `smoke.config.js` next to it holds the app's URL,
-its `<title>` and how it represents the resolved theme. It asserts only what the
-repo's own source provably produces:
-
-1. the site answers 200 and the `<title>` is this app's — not a stale deploy;
-2. nothing throws on first paint;
-3. the theme arrives resolved on the first frame (the pre-mount script shipped);
-4. the corner switcher is mounted, switches, and the preference survives a
-   reload — or, for an app that declines a theme under Module 12, that no
-   switcher is mounted at all.
-
-Assertions invented from guessed page copy do not belong here: they break on a
-wording change and teach everyone to ignore the suite. App-specific checks go in
-a sibling spec file (ctrlhq's `auth.spec.js` is the example).
-
-It does not run in the push/PR job, and it cannot run from a development
-sandbox — outbound HTTPS there is proxied to an allowlist that excludes these
-domains. `.github/workflows/smoke.yml` runs it on `workflow_dispatch`, so it can
-be fired the moment a deploy finishes, with a daily cron as the backstop.
-
-**Expect it to be red on an app whose latest merge has not been deployed.** That
-is the suite working, not failing: the fix is `npm run deploy:site`.
-
----
-
-## Onboarding checklist for a brand-new app
-
-1. Pick the backend kind and confirm an adapter exists in Mission Control
-   (`api/_lib/adapters/`) — build one if this is a new kind (not `base44`).
-2. Stand up the tenant entity with `billing_status` (Module 1) from day one —
-   retrofitting it later means an audit/backfill script, not a migration.
-3. Declare the role model in one file (Module 2) before writing any RLS rule
-   that depends on it.
-4. Stand up the permission registry + server-side "Safe function" pattern
-   (Module 3) for every write path from the start — this is far cheaper before
-   a permission bypass has shipped than after.
-5. Write RLS with the four-op `$or` shape from Module 4 from the first entity,
-   run the static validator in CI from commit one.
-6. Add the health check endpoint (Module 5).
-7. Wire `appConfig`-style versioning + release script (Module 6).
-8. Build the Account/Danger-zone screen (Module 7) and the Support entry point
-   (Module 8) before first tenant onboarding, not after.
-9. Add the `apps/` page on `acaciaco-site` (Module 9) and register the app in
-   Mission Control's `apps` table (`npm run onboard:base44 -- <repoPath> --dry`
-   to preview).
-10. Build the login page to the Module 10 bar.
-11. Copy the theme switcher in from [`shared/theme/`](shared/theme/) (Module 12)
-    and delete any other theme control.
-12. Copy the smoke suite in from [`shared/smoke/`](shared/smoke/) (Module 13)
-    and point its config at the app's real URL.
-13. Copy `CHECKLIST.md` from this repo into the new app's `CLAUDE.md`.
-
-See [`CHECKLIST.md`](CHECKLIST.md) for the compact, copy-pasteable version of
-this list, and [`docs/incidents.md`](docs/incidents.md) for the full postmortems
-this standard was distilled from.
-
----
-
 ## 11. Deploy discipline & the endpoint budget
 
 Base44 caps an app at **50 backend functions**. That cap is not a soft limit:
@@ -473,3 +361,234 @@ failing test. The audit prints what the repo can prove and flags the rest as
 annotates `(N automation)`) and the Automations panel before touching them.
 Treat any existing "deliberately left untouched" list as a lead, not a fact —
 both apps' lists had gone stale.
+
+---
+
+## 12. Theme control — light, dark, and the device
+
+Every app offers all three, from the same control, in the same place.
+
+**Three modes, not two.** What gets stored is the operator's *preference* —
+`'light' | 'dark' | 'system'` — never the resolved colour. `system` keeps
+resolving against `prefers-color-scheme` for as long as it is selected, so a
+phone that turns dark at sunset turns the app dark with it. A switcher that
+stored the resolved colour would silently throw away the choice.
+
+**One control, in a corner.** A small circle pinned to a screen corner showing
+the mode in force; pressing it grows the circle sideways into a three-slot
+track whose indicator slides to the chosen slot. Three states get three
+physical positions, which is the thing a sun/moon toggle structurally cannot do
+once "follow the device" is an option. The canonical implementation lives in
+[`shared/theme/`](shared/theme/) — copy it, do not re-implement it, and do not
+edit an app's copy in place.
+
+**It is the only theme control in the app.** Sidebar toggles, header buttons and
+command-palette entries that write the theme come out when the switcher goes in:
+two writers of the theme class fight over it, and the older ones can only ever
+reach two of the three modes. A command palette may keep *three* commands (one
+per mode) — that is a keyboard shortcut to the same state, not a second writer
+of a different model.
+
+**No flash of the wrong theme.** `index.html` carries a pre-mount script that
+resolves and applies the theme before the app mounts, using the same storage key
+and the same three values as the provider. Both sides carry a comment pointing
+at the other; they are kept in sync by hand.
+
+**The dark palette has to actually be finished.** Wiring a switcher onto an app
+whose screens are half hardcoded light colours ships a broken mode, which is
+worse than not offering one. Before turning the control on: every surface comes
+from a semantic token, and the colours that legitimately cannot (status chips —
+red / amber / emerald washes) carry an explicit dark counterpart.
+
+**It may not cover anything.** A control pinned above everything, in a corner,
+on every screen is exactly the shape of thing that ends up sitting on a mobile
+tab bar, a floating action button or a sticky *Guardar* — and when it does, the
+app has lost a function at the one width nobody opened. Each app places the
+control with `--theme-switcher-bottom` / `--theme-switcher-right` in its own
+stylesheet and lifts it above its own bottom chrome per breakpoint:
+
+```css
+:root { --theme-switcher-bottom: 1rem; --theme-switcher-right: 1rem; }
+@media (max-width: 767px) { :root { --theme-switcher-bottom: 5.5rem; } }
+```
+
+Placement is per-app because the chrome is per-app — a bottom tab bar on mobile
+only, a rail on desktop, a FAB already holding one corner (Plink FX puts the
+switcher bottom-**left** for exactly that reason). What is not per-app is the
+obligation: **phone, tablet and desktop, collapsed and expanded**. Module 13's
+suite checks it at all three widths in both states, so this is enforced rather
+than promised.
+
+Two directions both count as failure, and the check names them separately:
+something painted over the switcher (the operator cannot change the theme), and
+the switcher answering for a control underneath it (the operator cannot use the
+app). Beware a parent that opens a stacking context — `isolation: isolate` or a
+`transform` on an app shell confines the switcher's `z-index` inside it, so a
+high number is not by itself proof of anything.
+
+**An app may decline dark or light**, but only on a stated design ground, in its
+own `CLAUDE.md`, naming the constraint — brand assets that only sit on one
+ground, a physical use context. An app that declines ships no switcher at all
+rather than a control with one working option, and Module 13's suite then
+asserts the absence instead of the behaviour.
+
+Treat a decline as a dated estimate of the work, not a permanent exemption.
+`kitchops` declined on exactly those grounds — photographic brand assets, copper
+that reads as mud on white, a phone in a dark kitchen — and then did it anyway a
+day later, which is worth reading before writing your own decline, because the
+three answers generalise:
+
+- **Photographic assets keep their own ground** rather than being re-lit. The
+  mark sits in a tile that stays dark in both themes, which on a light screen
+  reads as a stamped medallion. A whole panel can do the same by scoping the
+  `dark` class to that subtree — every colour is a variable, so the subtree
+  inherits the other theme with no `dark:` variants at all.
+- **A brand colour that fails on the other ground splits in two**, it does not
+  move. The fill keeps the true value in both themes; only the *ink* changes.
+  Measure it: kitchops' copper is 3.4:1 as text on a light card and 7.1:1 once
+  oxidised, and it is used as text 36 times against a solid fill twice.
+- **"It is used in the dark"** is an argument about the **default**, which the
+  app keeps. It is not an argument about the second theme existing.
+
+Turning a second theme on is also the cheapest audit of the first one: doing it
+in kitchops surfaced a dark-on-dark chat bubble, three scaffold screens painted
+with Tailwind classes its own config had deleted, an invisible 420px strip of
+the toast viewport eating every click in the bottom-right corner, and a login
+headline that had been overlapping itself in **both** themes.
+
+
+---
+
+## 13. Live-site smoke test — `npm run test:smoke`
+
+Every app has one, and it checks the **deployed** site rather than a local
+build. That is the point: builds are green, and the failure that actually costs
+days is a change that merged and was never served (Module 11). This is the
+"verify by content, not by a commit hash" rule, automated.
+
+The suite lives in [`shared/smoke/`](shared/smoke/) — `smoke.spec.js` is
+byte-identical in every repo, `smoke.config.js` next to it holds the app's URL,
+its `<title>` and how it represents the resolved theme. It asserts only what the
+repo's own source provably produces:
+
+1. the site answers 200 and the `<title>` is this app's — not a stale deploy;
+2. nothing throws on first paint;
+3. the theme arrives resolved on the first frame (the pre-mount script shipped);
+4. the corner switcher is mounted, switches, and the preference survives a
+   reload — or, for an app that declines a theme under Module 12, that no
+   switcher is mounted at all;
+5. the switcher covers nothing and is covered by nothing, at phone, tablet and
+   desktop widths, collapsed and expanded (Module 12).
+
+Assertions invented from guessed page copy do not belong here: they break on a
+wording change and teach everyone to ignore the suite. App-specific checks go in
+a sibling spec file (ctrlhq's `auth.spec.js` is the example).
+
+It does not run in the push/PR job, and it cannot run from a development
+sandbox — outbound HTTPS there is proxied to an allowlist that excludes these
+domains. `.github/workflows/smoke.yml` runs it on `workflow_dispatch`, so it can
+be fired the moment a deploy finishes, with a daily cron as the backstop.
+
+**Expect it to be red on an app whose latest merge has not been deployed.** That
+is the suite working, not failing: the fix is `npm run deploy:site`.
+
+---
+
+## 14. Multi-tenant isolation audit — standing, evidenced, repeated
+
+Module 4 says how to write an RLS rule. This says: **go and check, on a
+schedule, that nothing in the app can read or write another tenant's data** —
+entities, functions, exports, mail, files, all of it. The two are not the same
+job, and every cross-tenant defect this portfolio has actually shipped got past
+correctly-written RLS somewhere else.
+
+**Why a rule review is not enough.** The failures were all syntactically valid:
+
+- **cateqhub, `Parish`**: `delete` carried a
+  `{"user_condition":{"data.parish_role":"admin"}}` branch with **no entity-side
+  tenant match**. Any parish admin could delete *any other parish* by SDK call.
+  Valid JSON, valid rule, catastrophic. `update` had it too.
+- **liuma**: `{"data.school_id": X, "user_condition": Y}` — the engine takes
+  `user_condition` as the **only** key of its rule object and silently drops the
+  sibling. The tenant clause was not enforced on **29 entities, 84 instances**.
+  Nothing was malformed; the rule simply did not mean what it read as.
+- **puntos, `Business`**: whole-record update for the tenant's own admin, with
+  no field lock on `billing_status`/`license_plan`. Not a leak between tenants —
+  a tenant editing the thing that governs its own access. Same shape found on
+  rumbo's `TenantLicense`.
+- **stockflow / flowfin / ctrlhq / rumbo**: a `PermissionProfile` override and
+  `billing_status` both live on a *different row*, and these RLS engines cannot
+  join. Both were enforced in the UI only until a `guardedEntityWrite`-style
+  function was added. A hidden button is not an access control.
+
+**What the audit covers.** Walk each of these and write down what you found,
+per app, with the date:
+
+1. **Every entity**: the four-op `$or`, both halves of every comparison, the
+   service-role branch, and no role branch that is not `$and`-ed to a tenant
+   match. Static checker in CI, plus a read of every rule the checker cannot
+   judge.
+2. **Every backend function**: the tenant is **re-derived server-side** from the
+   caller's own record or token, never taken from the request body. On
+   update/delete the check is against the **stored** record's tenant, not the
+   submitted one. Enumerate the endpoints and tick them off — `npm run
+   functions:audit` lists them.
+3. **Field-level locks** on anything the tenant must not write about itself:
+   licence state, plan, limits, role, tenant id. Module 1's "written only by
+   Mission Control" is a lie unless the field is actually locked.
+4. **Exports, reports and search**: the widest read paths in the app, and the
+   ones most often written as "it runs as service role, it's for admins". Every
+   read filtered by the caller's own tenant, re-derived (Module 7).
+5. **Outbound anything**: mail recipients, webhooks, notification targets and
+   file/attachment URLs read from the stored row, never from the request —
+   otherwise a leaked password mails arbitrary files to arbitrary addresses.
+6. **Tenant switching**: nothing from the previous tenant survives the switch —
+   no cached list, no in-memory store, no stale `business_id` in a closure. And
+   a switch into a tenant you do not belong to must answer the **same** refusal
+   as a tenant that does not exist, so the endpoint is not an existence oracle.
+7. **The deployed schema, not the repo file.** Re-read the live schema and diff
+   it against the repo. A fix that was committed and never pushed is a fix that
+   does not exist (Modules 4 and 11).
+
+**Evidence, not assertion.** "Audited" means a dated line in the app's
+`CLAUDE.md` naming what was checked, what was found, what was fixed and **what
+could not be verified here** — an authenticated session as a restricted user of
+a second tenant is usually the gap, and saying so is worth more than implying
+coverage that was not achieved. Re-audit whenever an entity, a function or a
+role is added, and at minimum whenever the app is audited against this standard
+as a whole.
+
+---
+
+## Onboarding checklist for a brand-new app
+
+1. Pick the backend kind and confirm an adapter exists in Mission Control
+   (`api/_lib/adapters/`) — build one if this is a new kind (not `base44`).
+2. Stand up the tenant entity with `billing_status` (Module 1) from day one —
+   retrofitting it later means an audit/backfill script, not a migration.
+3. Declare the role model in one file (Module 2) before writing any RLS rule
+   that depends on it.
+4. Stand up the permission registry + server-side "Safe function" pattern
+   (Module 3) for every write path from the start — this is far cheaper before
+   a permission bypass has shipped than after.
+5. Write RLS with the four-op `$or` shape from Module 4 from the first entity,
+   run the static validator in CI from commit one.
+6. Add the health check endpoint (Module 5).
+7. Wire `appConfig`-style versioning + release script (Module 6).
+8. Build the Account/Danger-zone screen (Module 7) and the Support entry point
+   (Module 8) before first tenant onboarding, not after.
+9. Add the `apps/` page on `acaciaco-site` (Module 9) and register the app in
+   Mission Control's `apps` table (`npm run onboard:base44 -- <repoPath> --dry`
+   to preview).
+10. Build the login page to the Module 10 bar.
+11. Copy the theme switcher in from [`shared/theme/`](shared/theme/) (Module 12)
+    and delete any other theme control.
+12. Copy the smoke suite in from [`shared/smoke/`](shared/smoke/) (Module 13)
+    and point its config at the app's real URL.
+13. Run the Module 14 isolation audit before the **second** tenant exists —
+    with one tenant nothing can leak, which is also why nothing gets caught.
+14. Copy `CHECKLIST.md` from this repo into the new app's `CLAUDE.md`.
+
+See [`CHECKLIST.md`](CHECKLIST.md) for the compact, copy-pasteable version of
+this list, and [`docs/incidents.md`](docs/incidents.md) for the full postmortems
+this standard was distilled from.

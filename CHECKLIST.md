@@ -52,13 +52,26 @@ jospabloh/acacia-app-standard. Status:
       and rendered once inside the theme provider. Preference stored as
       'light' | 'dark' | 'system' (never the resolved colour), pre-mount script
       in index.html so there is no flash, and no other theme control left in
-      the app. An app that ships only one theme says so, with its reason, here.
+      the app. Placed with `--theme-switcher-bottom/right` so it covers no
+      control and is covered by none, on phone, tablet and desktop, collapsed
+      and expanded. An app that ships only one theme says so, with its reason,
+      here.
 
 - [ ] Module 13 — Live-site smoke test: `npm run test:smoke` runs the shared
       suite from `shared/smoke/` against the DEPLOYED site (title, no throw,
-      theme painted pre-mount, switcher works), wired to
-      `.github/workflows/smoke.yml` on workflow_dispatch + a daily cron. Red
-      here means the last merge was never deployed — that is the suite working.
+      theme painted pre-mount, switcher works and collides with nothing at the
+      three widths), wired to `.github/workflows/smoke.yml` on
+      workflow_dispatch + a daily cron. Red here means the last merge was never
+      deployed — that is the suite working.
+
+- [ ] Module 14 — Multi-tenant isolation audit: dated, evidenced, and repeated
+      whenever an entity, a function or a role is added. Not a re-read of the
+      RLS rules (Module 4) — a walk of every entity, every backend function
+      (tenant re-derived server-side, never from the request body; checked
+      against the STORED record on update/delete), every field lock, every
+      export/report/search, every outbound recipient, and tenant switching. The
+      deployed schema, not the repo file. Write down what could NOT be verified.
 
 Last audited against the standard: <date> — <what changed / what's still open>
+Last multi-tenant isolation audit: <date> — <scope, findings, what's unverified>
 ```

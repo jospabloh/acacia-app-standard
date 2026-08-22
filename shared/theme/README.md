@@ -34,6 +34,20 @@ ACACIA apps finds the same thing in the same corner of both.
    @media (max-width: 767px) { :root { --theme-switcher-bottom: 5.5rem; } }
    ```
 
+   Then look at the corner at **phone, tablet and desktop**, with the track both
+   collapsed and expanded. The control is pinned above everything on every
+   screen, so it is one careless corner away from sitting on a tab bar, a
+   floating action button or a sticky *Guardar* — and an app that has lost a
+   button at one width has lost it silently. If another control already owns
+   that corner, move the switcher rather than the control: Plink FX puts it
+   bottom-**left** because the calculator FAB owns bottom-right.
+
+   Module 13's smoke suite asserts this at all three widths in both states, and
+   reports the two directions separately — something painted over the switcher,
+   and the switcher answering for a control beneath it. Watch for a parent with
+   `isolation: isolate` or a `transform`: it opens a stacking context and traps
+   the switcher's `z-index` inside it, so a large number proves nothing.
+
 6. Delete every other theme control in the app. Two writers of the theme class
    will fight, and a two-state toggle cannot express "follow the device"
    anyway.

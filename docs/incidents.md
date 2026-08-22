@@ -241,3 +241,45 @@ Lessons:
 3. **A user-reported bug is not closed when the PR merges.** It is closed when
    the thing the user touches behaves differently. For this portfolio that is
    always at least one deploy past the merge.
+
+---
+
+## Plink FX — two copies of one app, and a crash a transpiler hid (2026-08-22)
+
+Plink FX exists twice: `jospabloh/plink_fx`, a standalone PWA build, and
+`freeware/plink-fx/` inside `jospabloh/acaciaco-site`, which is the copy
+acaciaco.com.mx actually serves. Nothing kept them in step, and they drifted for
+months.
+
+**Both sides lost ground, which is why this is worse than a stale fork.** The
+served copy had gone that whole time with no error boundary (a render fault =
+blank page), no focus trap on the post-trip dialog, no guard against dividing by
+a zero budget, no `<h1>`, `role="tablist"` on buttons that govern no tabs, and
+358 KB of jsPDF pulled from a third-party CDN on every visit. The repo copy had
+gone the same months without the stale-trip-date fix and without a single
+translated authentication error. Each side had been improved by someone who
+could only see one of them.
+
+**The find that only appeared when the two files were put side by side:** the
+served copy's `downloadSummary` read `effectiveLang` in its dependency array
+before the `const` that declares it. A textbook TDZ `ReferenceError` — and it
+had never once been observed, because `@babel/standalone` compiles `const` down
+to `var` for its browser targets, so the read quietly produced `undefined`
+instead of throwing. The identical file died on mount the moment it went through
+the other repo's es2020 bundle.
+
+Lessons:
+
+1. **A permissive transpiler can hide a crash indefinitely.** In-browser Babel
+   is not a neutral way to ship the same source; it changes which bugs are
+   fatal. The jsdom test that mounts the *built bundle* with production React is
+   what surfaced this, and it is worth having wherever a file is served two ways.
+2. **Duplicated source needs an automated comparison or it will diverge** — and
+   it will diverge in both directions, so "just copy the good one over" destroys
+   work. `npm run check:mirror` now compares `app.jsx`, `tweaks-panel.jsx` and
+   the shared stylesheet against **what the site actually serves**, on a daily
+   cron, for the same reason every other check in this portfolio reads content
+   rather than a commit hash.
+3. **Name which copy is canonical, in both repos' `CLAUDE.md`.** Reconciling
+   these took reading 874 lines of diff and judging each hunk on its merits;
+   the cost of that is the price of never having written down which one wins.

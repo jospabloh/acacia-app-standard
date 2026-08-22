@@ -426,6 +426,27 @@ app). Beware a parent that opens a stacking context — `isolation: isolate` or 
 `transform` on an app shell confines the switcher's `z-index` inside it, so a
 high number is not by itself proof of anything.
 
+**What the automated half does not reach, and what you owe because of it.** The
+suite holds no credentials on purpose, so it only visits the routes an anonymous
+visitor can — the home page, plus whatever the app lists in `config.routes`.
+List the public screens whose chrome differs (register, password reset, a 404);
+that is cheap and it is where a second corner control usually turns up. But a
+sticky *Guardar* on an authenticated edit screen is **not** covered, and no
+amount of green here says otherwise. **Look at the corner by hand on the first
+deploy of any app whose authenticated chrome changed**, and write what you found
+in its `CLAUDE.md` — including that you could not check it, if you could not.
+
+The check is deliberately not a rectangle-intersection test: a control clipped
+at one corner by a rounded bubble is still usable, and a suite that fails on
+that is a suite people learn to ignore. The switcher itself is probed at five
+points rather than one, because a bar across its lower half leaves the centre
+pixel free and a one-point check calls that fine. Each other control is judged
+by its own midpoint — and that is a result, not a shortcut: for two axis-aligned
+rectangles, an overlap covering half a control's area always contains that
+control's centre, so an area threshold would be unreachable code pretending to
+add coverage. Anything small and separately clickable in the overlapped corner
+is its own element and gets its own midpoint.
+
 **An app may decline dark or light**, but only on a stated design ground, in its
 own `CLAUDE.md`, naming the constraint — brand assets that only sit on one
 ground, a physical use context. An app that declines ships no switcher at all
@@ -478,7 +499,9 @@ repo's own source provably produces:
    reload — or, for an app that declines a theme under Module 12, that no
    switcher is mounted at all;
 5. the switcher covers nothing and is covered by nothing, at phone, tablet and
-   desktop widths, collapsed and expanded (Module 12).
+   desktop widths, collapsed and expanded, on every route the app lists in
+   `config.routes` (Module 12). Public routes only — the suite has no
+   credentials, and Module 12 says what you owe for the screens it cannot see.
 
 Assertions invented from guessed page copy do not belong here: they break on a
 wording change and teach everyone to ignore the suite. App-specific checks go in

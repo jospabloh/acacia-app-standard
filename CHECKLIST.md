@@ -60,7 +60,8 @@ jospabloh/acacia-app-standard. Status:
 - [ ] Module 13 — Live-site smoke test: `npm run test:smoke` runs the shared
       suite from `shared/smoke/` against the DEPLOYED site (title, no throw,
       theme painted pre-mount, switcher works and collides with nothing at the
-      three widths), wired to `.github/workflows/smoke.yml` on
+      three widths on every public route listed), wired to
+      `.github/workflows/smoke.yml` on
       workflow_dispatch + a daily cron. Red here means the last merge was never
       deployed — that is the suite working.
 

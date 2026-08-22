@@ -16,6 +16,17 @@ export default {
   // corner of the screen is clickable (a cookie modal, a welcome sheet).
   // dismissOverlay: '.cookie-banner button',
 
+  // Optional: extra PUBLIC routes to run the corner-collision check on, on top
+  // of the home page. Relative, like './', so a sub-path deployment still
+  // resolves. List the screens whose chrome differs — a register page, a
+  // password reset, a 404 — since a second corner control usually turns up on
+  // one of those rather than on the login.
+  //
+  // Screens behind a login are NOT covered: this suite holds no credentials on
+  // purpose. That gap is real, it is named in Module 12, and the way it gets
+  // closed is a look by hand on the first deploy.
+  // routes: ['./', './register', './forgot-password', './no-such-page'],
+
   theme: {
     // How the app represents the resolved colour, and where its switcher lives:
     //   'class'     — Tailwind `.dark` on <html>;  root '[data-theme-switcher]'

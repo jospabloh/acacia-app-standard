@@ -428,10 +428,33 @@ high number is not by itself proof of anything.
 
 **An app may decline dark or light**, but only on a stated design ground, in its
 own `CLAUDE.md`, naming the constraint — brand assets that only sit on one
-ground, a physical use context. `kitchops` is the standing example: photographic
-brand assets and copper that reads as mud on white, used in a kitchen at night.
-An app that declines ships no switcher at all rather than a control with one
-working option.
+ground, a physical use context. An app that declines ships no switcher at all
+rather than a control with one working option, and Module 13's suite then
+asserts the absence instead of the behaviour.
+
+Treat a decline as a dated estimate of the work, not a permanent exemption.
+`kitchops` declined on exactly those grounds — photographic brand assets, copper
+that reads as mud on white, a phone in a dark kitchen — and then did it anyway a
+day later, which is worth reading before writing your own decline, because the
+three answers generalise:
+
+- **Photographic assets keep their own ground** rather than being re-lit. The
+  mark sits in a tile that stays dark in both themes, which on a light screen
+  reads as a stamped medallion. A whole panel can do the same by scoping the
+  `dark` class to that subtree — every colour is a variable, so the subtree
+  inherits the other theme with no `dark:` variants at all.
+- **A brand colour that fails on the other ground splits in two**, it does not
+  move. The fill keeps the true value in both themes; only the *ink* changes.
+  Measure it: kitchops' copper is 3.4:1 as text on a light card and 7.1:1 once
+  oxidised, and it is used as text 36 times against a solid fill twice.
+- **"It is used in the dark"** is an argument about the **default**, which the
+  app keeps. It is not an argument about the second theme existing.
+
+Turning a second theme on is also the cheapest audit of the first one: doing it
+in kitchops surfaced a dark-on-dark chat bubble, three scaffold screens painted
+with Tailwind classes its own config had deleted, an invisible 420px strip of
+the toast viewport eating every click in the bottom-right corner, and a login
+headline that had been overlapping itself in **both** themes.
 
 
 ---

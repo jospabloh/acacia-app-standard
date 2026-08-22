@@ -340,6 +340,40 @@ brand assets and copper that reads as mud on white, used in a kitchen at night.
 An app that declines ships no switcher at all rather than a control with one
 working option.
 
+
+---
+
+## 13. Live-site smoke test — `npm run test:smoke`
+
+Every app has one, and it checks the **deployed** site rather than a local
+build. That is the point: builds are green, and the failure that actually costs
+days is a change that merged and was never served (Module 11). This is the
+"verify by content, not by a commit hash" rule, automated.
+
+The suite lives in [`shared/smoke/`](shared/smoke/) — `smoke.spec.js` is
+byte-identical in every repo, `smoke.config.js` next to it holds the app's URL,
+its `<title>` and how it represents the resolved theme. It asserts only what the
+repo's own source provably produces:
+
+1. the site answers 200 and the `<title>` is this app's — not a stale deploy;
+2. nothing throws on first paint;
+3. the theme arrives resolved on the first frame (the pre-mount script shipped);
+4. the corner switcher is mounted, switches, and the preference survives a
+   reload — or, for an app that declines a theme under Module 12, that no
+   switcher is mounted at all.
+
+Assertions invented from guessed page copy do not belong here: they break on a
+wording change and teach everyone to ignore the suite. App-specific checks go in
+a sibling spec file (ctrlhq's `auth.spec.js` is the example).
+
+It does not run in the push/PR job, and it cannot run from a development
+sandbox — outbound HTTPS there is proxied to an allowlist that excludes these
+domains. `.github/workflows/smoke.yml` runs it on `workflow_dispatch`, so it can
+be fired the moment a deploy finishes, with a daily cron as the backstop.
+
+**Expect it to be red on an app whose latest merge has not been deployed.** That
+is the suite working, not failing: the fix is `npm run deploy:site`.
+
 ---
 
 ## Onboarding checklist for a brand-new app
@@ -365,7 +399,9 @@ working option.
 10. Build the login page to the Module 10 bar.
 11. Copy the theme switcher in from [`shared/theme/`](shared/theme/) (Module 12)
     and delete any other theme control.
-12. Copy `CHECKLIST.md` from this repo into the new app's `CLAUDE.md`.
+12. Copy the smoke suite in from [`shared/smoke/`](shared/smoke/) (Module 13)
+    and point its config at the app's real URL.
+13. Copy `CHECKLIST.md` from this repo into the new app's `CLAUDE.md`.
 
 See [`CHECKLIST.md`](CHECKLIST.md) for the compact, copy-pasteable version of
 this list, and [`docs/incidents.md`](docs/incidents.md) for the full postmortems

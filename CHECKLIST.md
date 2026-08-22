@@ -54,5 +54,11 @@ jospabloh/acacia-app-standard. Status:
       in index.html so there is no flash, and no other theme control left in
       the app. An app that ships only one theme says so, with its reason, here.
 
+- [ ] Module 13 — Live-site smoke test: `npm run test:smoke` runs the shared
+      suite from `shared/smoke/` against the DEPLOYED site (title, no throw,
+      theme painted pre-mount, switcher works), wired to
+      `.github/workflows/smoke.yml` on workflow_dispatch + a daily cron. Red
+      here means the last merge was never deployed — that is the suite working.
+
 Last audited against the standard: <date> — <what changed / what's still open>
 ```

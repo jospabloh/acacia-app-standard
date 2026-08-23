@@ -583,6 +583,78 @@ as a whole.
 
 ---
 
+## 15. The bridge to Mission Control — one shape, one key per app
+
+Every app talks to Mission Control through the same two channels, and they are
+not optional or app-flavoured. This module exists because "the same" turned out
+to mean "the same secret", which is not the same thing at all.
+
+**The channels.** Mission Control calls the app's `acaciaControl` function over
+an HMAC-signed body for everything app-specific — licence read/write, health
+`ping`, ticket pull, usage and session sync. The app calls Mission Control's
+`/api/ingest/ticket` the moment a customer raises a ticket, also HMAC-signed.
+An app that also exposes a bare `health` or a cron-ish endpoint gates it with a
+bearer value instead, because there is no body to sign.
+
+**The key is derived per app, never the master.**
+
+```
+appKey = HMAC-SHA256(INGEST_HMAC_SECRET, "acacia.app.v1." + <slug>)
+```
+
+`<slug>` is the app's Mission Control id — `apps.id` in the bodega, and the
+`ACACIA_APP_SLUG` app secret on the app side. Both are required; an app that
+does not know its own slug cannot join the bridge.
+
+The reason is narrow and worth stating plainly. `INGEST_HMAC_SECRET` is **one
+value shared by the whole portfolio**. A signature made with it proves "someone
+who holds the shared secret" — it can never prove "this is app X". The
+module-14 audit of Mission Control (2026-08-23) found the consequence: the app
+name travels in the request body, so any app could sign a payload naming a
+different app and have Mission Control write a ticket under that attribution.
+Not an outsider hole — the holders are ACACIA's own apps — but a blast-radius
+one: leak one app's secret and you have leaked all nine, and that same value is
+also the bearer several `health` endpoints accept and what authorises
+`license.set`.
+
+Deriving fixes it because the slug selects the key. A body claiming to be
+another app is checked against *that* app's key and fails unless the sender
+actually holds it.
+
+**Copy [`shared/bridge/acaciaSign.ts`](shared/bridge/acaciaSign.ts) in**, at
+`base44/functions/<fn>/_acaciaSign.ts`, unchanged. Deno isolates each function
+directory, so an app whose bridge touches three functions carries three
+identical copies; that is expected, and a drift check in CI is what keeps them
+identical by construction rather than by discipline. Mission Control's Node
+half lives in `api/_lib/ingestSign.js` and pins **the same test vector** — two
+HMAC implementations in two runtimes only stay equal if something asserts it,
+and a drift shows up at runtime as `bad signature` on every call, which reads
+like a misconfigured secret rather than a code change.
+
+**The migration has an order, and it is the opposite of the obvious one.**
+Verification accepts either key while `ACCEPT_LEGACY_MASTER` is `true`, so
+nothing breaks whoever deploys first. But Mission Control deploys on merge
+while apps deploy by hand, so MC is always first — which is why MC keeps
+*signing* outbound with the master until every app can accept derived.
+Sequence:
+
+1. Mission Control verifies per app, still signs with the master.
+2. Every app signs outbound with its derived key and accepts both inbound.
+3. Only then: flip `ACCEPT_LEGACY_MASTER` to `false` everywhere, and switch
+   MC's outbound signing to `signFor`. **This step is the fix** — until it
+   lands, a legacy master signature is still accepted and the hole is open.
+
+Grep the constant across the portfolio to see who is still on legacy. A new app
+joining after step 3 starts at `false` and never carries the legacy path.
+
+**Do not give the bridge secret a second job.** Mission Control's `track.js`
+used `INGEST_HMAC_SECRET` as the fallback salt for hashing visitor IPs, so
+rotating the bridge secret would have silently rebucketed every unique-visitor
+count. An auth secret authenticates; anything else that needs a stable random
+string gets its own.
+
+---
+
 ## Onboarding checklist for a brand-new app
 
 1. Pick the backend kind and confirm an adapter exists in Mission Control
@@ -610,7 +682,11 @@ as a whole.
     and point its config at the app's real URL.
 13. Run the Module 14 isolation audit before the **second** tenant exists —
     with one tenant nothing can leak, which is also why nothing gets caught.
-14. Copy `CHECKLIST.md` from this repo into the new app's `CLAUDE.md`.
+14. Copy [`shared/bridge/acaciaSign.ts`](shared/bridge/acaciaSign.ts) in
+    (Module 15), set `ACACIA_APP_SLUG` to the app's Mission Control id, and
+    start with `ACCEPT_LEGACY_MASTER = false` — the legacy path exists only for
+    apps that predate the derivation.
+15. Copy `CHECKLIST.md` from this repo into the new app's `CLAUDE.md`.
 
 See [`CHECKLIST.md`](CHECKLIST.md) for the compact, copy-pasteable version of
 this list, and [`docs/incidents.md`](docs/incidents.md) for the full postmortems

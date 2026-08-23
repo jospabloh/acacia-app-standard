@@ -73,6 +73,16 @@ jospabloh/acacia-app-standard. Status:
       export/report/search, every outbound recipient, and tenant switching. The
       deployed schema, not the repo file. Write down what could NOT be verified.
 
+- [ ] Module 15 — Bridge to Mission Control: `shared/bridge/acaciaSign.ts`
+      copied in unchanged (one copy per bridge-touching function directory —
+      Deno isolates them), `ACACIA_APP_SLUG` set to this app's Mission Control
+      id, and outbound signing on the DERIVED key, never the bare
+      `INGEST_HMAC_SECRET`. That secret is one value shared by the whole
+      portfolio, so a signature made with it proves "someone holds the shared
+      secret", never "this is app X". A new app starts at
+      `ACCEPT_LEGACY_MASTER = false`; the legacy path exists only for apps that
+      predate the derivation.
+
 Last audited against the standard: <date> — <what changed / what's still open>
 Last multi-tenant isolation audit: <date> — <scope, findings, what's unverified>
 ```

@@ -35,6 +35,11 @@ jospabloh/acacia-app-standard. Status:
       data export, irreversible delete with a real confirmation step.
 - [ ] Module 8 — Support/mejoras: entry point writes to this app first, then
       syncs into Mission Control's tickets/leads bodega. No parallel triage UI.
+      EVERY place a ticket is born (support page AND the danger zone's deletion
+      request) notifies Mission Control in real time — sign and POST from a
+      backend function if one already creates the ticket, else ping
+      `/api/ingest/ticket-pull` with `{app, ticketId}` from the browser. The
+      08:00 UTC sync is the backstop; on its own it costs the customer a day.
 - [ ] Module 9 — acaciaco-site: this app has a page under apps/ (or freeware/),
       using styles/base.css tokens, dark-theme correct.
 - [ ] Module 10 — Login page: on-brand, real error/suspended/view_only states,

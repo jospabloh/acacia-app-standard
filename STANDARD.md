@@ -257,6 +257,31 @@ app. Your app's obligation:
   and response happen from Mission Control's panel, where an operator sees
   every app's queue in one place. A per-app ticket system that diverges from
   that is exactly the parallel permission model Module 0 already warns against.
+- **Tell Mission Control the moment the ticket is written — the daily sync is
+  a backstop, not the delivery.** `api/cron/sync` runs once, at 08:00 UTC. An
+  app that relies on it alone leaves a customer who wrote at 09:00 waiting
+  twenty-three hours before support even knows. Real-time notification is part
+  of this module, not an optimization on top of it.
+
+There are two sanctioned ways to do it, and which one an app uses is decided by
+where its ticket gets created, not by preference:
+
+| the ticket is created… | do this | who |
+|---|---|---|
+| by a backend function already | sign and POST the record from that function to `/api/ingest/ticket` | rumbo (inline in `submitTicket`), puntos / liuma / radar (a `notifyTicketCreated` function) |
+| by the browser | `POST /api/ingest/ticket-pull` with `{app, ticketId}` | cateqhub, flowfin, stockflow, ctrlhq, kitchops |
+
+**Prefer `ticket-pull` unless a signer already exists.** It carries no secret,
+costs no function slot (Base44 caps an app at 50 and two apps are near it), and
+its body is not trusted: Mission Control takes only the id and reads the real
+record back over the `acaciaControl` bridge, so a forged body cannot inject a
+ticket and an unknown id just no-ops. Either way the call is fire-and-forget —
+`.catch(() => {})` — because a notification that fails must never cost the
+customer their ticket.
+
+Cover **every** place a ticket is born, not just the support page: the
+account-deletion request in Module 7's danger zone is a ticket too, and it is
+the one nobody remembers to wire.
 
 ---
 

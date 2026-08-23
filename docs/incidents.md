@@ -316,19 +316,41 @@ to files that actually reach the bundle:
 Zero files means the deploy was equivalent even if the SHAs differ. Anything
 else means the served site is behind.
 
-### 2. Three apps serve the Base44 platform shell, not their own build
+### 2. Three apps are behind Base44's platform login, so their own build is never served
 
 `liuma`, `puntos` and `radar` return ~14 KB of Base44's *own* frontend —
 `/static/index-*.js`, Monaco, Google SSO — on both their custom domain and their
-`.base44.app` subdomain, and `/` 302s to the platform's `/login`. A working app
-(`rumbo-fleet-flow.base44.app`, 11 KB) serves `/assets/index-*.js`, the Vite
-output. Their published site simply is not there, and it stayed that way hours
-after a `site deploy` that reported success.
+`.base44.app` subdomain. A working app (`rumbo-fleet-flow.base44.app`, 11 KB)
+serves `/assets/index-*.js`, the Vite output.
+
+**The first reading of this was wrong and is worth recording as such.** It looked
+like a failed publish — the sites were redeployed twice more, each reporting
+success, and nothing changed. The status line is what actually settles it:
+
+    rumbo, kitchops, cateqhub, ctrlhq, flowfin, stockflow → 200, no redirect
+    liuma, puntos, radar                                  → 302 → /login
+
+Those three have Base44's **platform-level authentication gate** switched on. The
+deploy uploads the build correctly every time; the platform simply never serves
+it to an anonymous visitor, answering with its own login instead. No amount of
+redeploying can fix a setting, which is exactly why three "successful" deploys
+looked like a mystery.
+
+Two consequences, and the second is the one that matters:
+
+- **The suite structurally cannot test an app behind that gate.** It holds no
+  credentials, by design. Those three repos need their smoke config to say so
+  rather than stay red forever.
+- **An anonymous visitor to `liuma.acaciaco.com.mx` does not reach LIUMA's login
+  page.** They get a Base44 page — no app `<title>`, no app OG tags, none of the
+  branding a working app like `rumbo` serves. That is a Module 10 problem
+  (login on-brand) hiding inside a Module 13 failure, and it is customer-facing.
 
 The tell, on any app, in one line:
 
-    curl -sL <url> | grep -c '/assets/index-'   # 1+ = the app's own build
-    curl -sL <url> | grep -c '/static/index-'   # 1+ = the platform shell
+    curl -sI <url> | grep -i location            # /login = platform gate
+    curl -sL <url> | grep -c '/assets/index-'    # 1+ = the app's own build
+    curl -sL <url> | grep -c '/static/index-'    # 1+ = the platform shell
 
 **This is worth its own assertion in the suite.** Today the platform shell fails
 the theme tests with `element(s) not found`, which reads like a missing

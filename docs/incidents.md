@@ -283,3 +283,93 @@ Lessons:
 3. **Name which copy is canonical, in both repos' `CLAUDE.md`.** Reconciling
    these took reading 874 lines of diff and judging each hunk on its merits;
    the cost of that is the price of never having written down which one wins.
+
+## Nine deploys, five red: what the first real smoke run found (2026-08-22)
+
+The portfolio's `test:smoke` suites were fired across all twelve UI repos for
+the first time right after a nine-app deploy round. **Seven green, five red** —
+and none of the five was the suite being wrong. They were three genuinely
+different failures that had been invisible until something looked at the served
+site instead of the repo.
+
+### 1. Nine deploys shipped the wrong commit
+
+Every `git pull` in the deploy round ran *before* the PRs merged, so every
+`npm run deploy:site` uploaded the previous commit. For six apps this cost
+nothing — the only delta was `tests/smoke/smoke.spec.js`, which never enters the
+bundle. For **kitchops** it cost everything: its local `main` was two merges
+behind, missing the PR that added the light theme, so the deploy shipped 13
+missing site files including `ThemeSwitcher.jsx`, `index.css` and `index.html`.
+The served page came back 3021 bytes with no pre-mount script.
+
+The lesson is the mirror image of the one every CLAUDE.md already carries.
+"Merging does not deploy" is true; so is **"deploying does not merge"** — a
+deploy is only as current as the checkout it runs from, and `✓ desplegado` says
+nothing about which commit that was. `git pull && npm run deploy:site`, in that
+order, in one command.
+
+To check afterwards, compare what was deployed against `origin/main`, restricted
+to files that actually reach the bundle:
+
+    git diff --name-only <deployed-sha>..origin/main -- src/ index.html public/
+
+Zero files means the deploy was equivalent even if the SHAs differ. Anything
+else means the served site is behind.
+
+### 2. Three apps serve the Base44 platform shell, not their own build
+
+`liuma`, `puntos` and `radar` return ~14 KB of Base44's *own* frontend —
+`/static/index-*.js`, Monaco, Google SSO — on both their custom domain and their
+`.base44.app` subdomain, and `/` 302s to the platform's `/login`. A working app
+(`rumbo-fleet-flow.base44.app`, 11 KB) serves `/assets/index-*.js`, the Vite
+output. Their published site simply is not there, and it stayed that way hours
+after a `site deploy` that reported success.
+
+The tell, on any app, in one line:
+
+    curl -sL <url> | grep -c '/assets/index-'   # 1+ = the app's own build
+    curl -sL <url> | grep -c '/static/index-'   # 1+ = the platform shell
+
+**This is worth its own assertion in the suite.** Today the platform shell fails
+the theme tests with `element(s) not found`, which reads like a missing
+component and cost an hour to trace. Worse, assertion #1 ("responds, and is this
+app") *passes* — the platform shell boots something that sets the right
+`<title>` — so the one check meant to prove "this is the right app" says yes
+while the app is not being served at all.
+
+### 3. An app's registered URL had no DNS record
+
+`radar.acaciaco.com.mx` does not resolve. Every assertion failed on
+`net::ERR_NAME_NOT_RESOLVED` before it could test anything. That hostname is not
+a guess in the test config: it is what Mission Control has registered for the
+app (`0015_seed_radar_app.sql`), so the same dead name is what the panel polls
+and what any customer-facing link points at.
+
+The config was deliberately **not** repointed at a `.base44.app` URL. Doing so
+would have turned the suite green while the app's official address stayed broken
+for everyone else — exactly the "green suite that means less than it looks like"
+the standard warns about.
+
+### 4. And one real bug, which is the point
+
+`cateqhub` failed with `something is painted over the switcher on tablet
+(plegado)`, reproducibly. The Radix toast container in `src/components/ui/toast.jsx`
+is a fixed, full-width strip pinned bottom-right (`max-w-[420px]` from `md` up)
+at `z-[100]`, invisible when empty but still taking pointer events over the
+corner the switcher lives in. Six repos had it unguarded; `pointer-events-none`
+on the container fixes it, since the toasts themselves already carry
+`pointer-events-auto`.
+
+That one is what the module-12 collision check exists for, and no local build
+would ever have shown it.
+
+### What a dev sandbox cannot do here, established by trying
+
+- Outbound HTTPS to these domains is blocked by the proxy allowlist
+  (`CONNECT tunnel failed, 403`). The Base44 app sandbox *can* reach them and
+  makes a usable probe.
+- The Base44 CLI inside that sandbox is unauthenticated and needs an interactive
+  device-code login; `~/.base44` holds no credentials. **Deploys need a human.**
+- Testing GitHub reachability with `api.github.com/rate_limit` proves nothing —
+  it answers 200 unauthenticated. A watcher built on that assumption polled an
+  error body for fifteen minutes. Check an endpoint that actually requires auth.

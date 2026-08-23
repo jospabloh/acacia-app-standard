@@ -631,6 +631,23 @@ HMAC implementations in two runtimes only stay equal if something asserts it,
 and a drift shows up at runtime as `bad signature` on every call, which reads
 like a misconfigured secret rather than a code change.
 
+**Copy [`shared/bridge/acaciaSign.test.ts`](shared/bridge/acaciaSign.test.ts)
+in too**, wherever the app's CI already runs `deno test`, changing only the
+import path. It has no external imports and touches no network, so it runs in a
+sandbox where `jsr.io` and `deno.land` are blocked. It pins the cross-language
+vector and asserts the thing this module exists for: a body signed by one app
+claiming to be another **fails**. Put it at the functions ROOT, never inside a
+function directory — every directory under `base44/functions/` becomes a
+deployed endpoint, and a test file is not one.
+
+**Delete the inline crypto the copy replaces.** Each `acaciaControl` carried its
+own `stableStringify`/`hmacHex`/`timingSafeEqual`, hand-mirrored against Mission
+Control. Once `_acaciaSign.ts` owns them, leaving the old ones is not tidiness —
+it is a second implementation of the same routine sitting in the same file,
+which is precisely the drift this module removes. `deno lint`'s `no-unused-vars`
+catches it in the three repos that run it; the other six have no deno step, so
+there the only guard is doing it.
+
 **The migration has an order, and it is the opposite of the obvious one.**
 Verification accepts either key while `ACCEPT_LEGACY_MASTER` is `true`, so
 nothing breaks whoever deploys first. But Mission Control deploys on merge

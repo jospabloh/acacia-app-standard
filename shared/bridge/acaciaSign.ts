@@ -121,12 +121,26 @@ export async function verifyAs(
     now?: number;
   },
 ): Promise<boolean> {
-  if (!master || !slug || !ts || !sig) return false;
-  if (Math.abs(now - Number(ts)) > maxSkewMs) return false;
+  if (!master || !ts || !sig) return false;
+  // Number(ts) on a non-numeric value is NaN, and `NaN > maxSkewMs` is false —
+  // so a bare comparison lets a malformed ts through the freshness window
+  // instead of rejecting it. The apps' acaciaControl already guarded this;
+  // the guard belongs here now that this file owns the check.
+  const tsNum = Number(ts);
+  if (!Number.isFinite(tsNum) || Math.abs(now - tsNum) > maxSkewMs) return false;
 
   const message = canonicalMessage(ts, action, params);
-  const key = await deriveAppKey(master, slug);
-  if (timingSafeEqualHex(await hmacHex(key, message), String(sig))) return true;
+
+  // A missing slug degrades to legacy rather than rejecting everything. Five
+  // apps have never needed ACACIA_APP_SLUG — only the four that push tickets
+  // did — so during the rollout this branch is the difference between "the
+  // bridge keeps working until the secret is set" and "the bridge dies the
+  // moment this deploys". Once ACCEPT_LEGACY_MASTER is false a missing slug
+  // DOES fail closed, which is correct: by then the secret is mandatory.
+  if (slug) {
+    const key = await deriveAppKey(master, slug);
+    if (timingSafeEqualHex(await hmacHex(key, message), String(sig))) return true;
+  }
 
   if (ACCEPT_LEGACY_MASTER) {
     return timingSafeEqualHex(await hmacHex(master, message), String(sig));
@@ -144,8 +158,9 @@ export async function verifyBearer(
   slug: string,
   provided: string | null,
 ): Promise<boolean> {
-  if (!master || !slug || !provided) return false;
-  if (timingSafeEqualHex(await deriveAppKey(master, slug), provided)) return true;
+  if (!master || !provided) return false;
+  // Missing slug → legacy only, same reasoning as verifyAs.
+  if (slug && timingSafeEqualHex(await deriveAppKey(master, slug), provided)) return true;
   if (ACCEPT_LEGACY_MASTER) return timingSafeEqualHex(master, provided);
   return false;
 }

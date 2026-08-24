@@ -105,6 +105,19 @@ jospabloh/acacia-app-standard. Status:
       Sincronizar ahora and confirm an `app_health` row with `status: ok` and a
       `control:run-sync` audit row for this app.
 
+- [ ] Module 18 — Multi-tenant account switching: the resolver that derives a
+      caller's tenant from creator/owner_email/members[] computes the FULL set
+      of matches, not just the first, and returns it alongside whatever is
+      already persisted — a persisted, still-valid tenant_id keeps winning, an
+      unambiguous single candidate still auto-assigns, and only true ambiguity
+      (no persisted tenant_id, 2+ candidates) blocks on a choice instead of
+      guessing. A dedicated switch endpoint re-derives the caller's candidate
+      set from scratch server-side (never trusts the requested tenant_id) and
+      answers a tenant the caller doesn't belong to with the exact same
+      refusal as a nonexistent one. The switcher control is visible only when
+      there is more than one candidate, and a successful switch hard-reloads
+      rather than resetting tenant-scoped state in place.
+
 Last audited against the standard: <date> — <what changed / what's still open>
 Last multi-tenant isolation audit: <date> — <scope, findings, what's unverified>
 Secrets last read back: <date> — <which ones, and how each was proven>

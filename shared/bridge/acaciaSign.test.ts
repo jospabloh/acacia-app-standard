@@ -150,9 +150,12 @@ Deno.test("legacy master is accepted while the flag is on, and only then", async
     "master signature is accepted exactly while ACCEPT_LEGACY_MASTER is true",
   );
 
-  // A missing slug degrades to legacy rather than rejecting everything — five
-  // apps have never had ACACIA_APP_SLUG set, and the rollout must not black the
-  // bridge out before that secret lands.
+  // A missing slug follows the same flag rather than having a rule of its own.
+  // With the flag off it fails, which is the desired end state; while it was on
+  // it degraded to legacy, which is what kept the bridge alive for the apps
+  // whose ACACIA_APP_SLUG had not landed yet. Asserting against the flag rather
+  // than a literal is deliberate: this test stayed meaningful through the flip,
+  // and cannot be satisfied by turning it off.
   assertEquals(
     await verifyAs(MASTER, "", { ts, action: "ping", params, sig: masterSig }),
     ACCEPT_LEGACY_MASTER,

@@ -9,7 +9,10 @@ reporting, changelog, account & danger zone, support/mejoras, its page on
 screen.
 
 - **[`STANDARD.md`](STANDARD.md)** — the full contract, module by module, with
-  the reasoning behind each rule. Start here.
+  the reasoning behind each rule. Start here. It ends with two tables worth
+  knowing about before you need them: the portfolio-wide **secrets inventory**
+  (Module 16) and **verification gates**, which says for each module what you
+  can run to prove it is actually live rather than merely merged.
 - **[`CHECKLIST.md`](CHECKLIST.md)** — the compact version, meant to be copied
   into a new app's own `CLAUDE.md` so every session working on that app sees
   it, not just the one that created it.

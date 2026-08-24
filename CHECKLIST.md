@@ -80,14 +80,32 @@ jospabloh/acacia-app-standard. Status:
 
 - [ ] Module 15 — Bridge to Mission Control: `shared/bridge/acaciaSign.ts`
       copied in unchanged (one copy per bridge-touching function directory —
-      Deno isolates them), `ACACIA_APP_SLUG` set to this app's Mission Control
-      id, and outbound signing on the DERIVED key, never the bare
-      `INGEST_HMAC_SECRET`. That secret is one value shared by the whole
-      portfolio, so a signature made with it proves "someone holds the shared
-      secret", never "this is app X". A new app starts at
-      `ACCEPT_LEGACY_MASTER = false`; the legacy path exists only for apps that
-      predate the derivation.
+      Deno isolates them) plus its test at the functions ROOT, and outbound
+      signing on the DERIVED key, never the bare `INGEST_HMAC_SECRET`. That
+      secret is one value shared by the whole portfolio, so a signature made
+      with it proves "someone holds the shared secret", never "this is app X".
+      A new app starts at `ACCEPT_LEGACY_MASTER = false`; the legacy path
+      exists only for apps that predate the derivation.
+
+- [ ] Module 16 — Secrets: `INGEST_HMAC_SECRET` (identical portfolio-wide),
+      `ACACIA_APP_SLUG` (exactly this app's Mission Control id — lowercase, no
+      spaces, no suffix), `ACACIA_MC_INGEST_URL` if a backend function pushes
+      tickets, `PLATFORM_OWNER_EMAIL`, and `CRON_SECRET` for any scheduled
+      endpoint. Every guard built on one of these FAILS CLOSED when the value
+      is missing, and that branch has a test. Each value has been READ BACK
+      from the panel or proven by a call that only succeeds if it is right — a
+      value documented as set is a claim about someone's memory, not about the
+      system, and this portfolio has lost the bridge once and exposed four
+      crons once on exactly that.
+
+- [ ] Module 17 — Mission Control side: row in `apps` (its `id` is the slug
+      everything else keys off), an adapter, and entries in
+      `licenseControl.js`, `ticketControl.js`, `messaging.js` plus the client
+      catalogue mirror. Then PROVE the data path, not just the config: press
+      Sincronizar ahora and confirm an `app_health` row with `status: ok` and a
+      `control:run-sync` audit row for this app.
 
 Last audited against the standard: <date> — <what changed / what's still open>
 Last multi-tenant isolation audit: <date> — <scope, findings, what's unverified>
+Secrets last read back: <date> — <which ones, and how each was proven>
 ```

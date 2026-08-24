@@ -848,6 +848,81 @@ the proof.
 
 ---
 
+## 18. Multi-tenant account switching — one email, several tenants
+
+**The gap this closes.** An operator's email is not exclusive to one tenant. The
+same person owns two rental fleets, an accountant admins three restaurants, a
+platform owner tests against a second tenant without a second inbox — nothing
+in the data model stops one email from being `owner_email`, the creator, or an
+invited member of more than one tenant record at once. What every app in this
+portfolio actually did about it, before this module, was pick the **first**
+match — by creation order, inside whatever function resolves the caller's
+tenant — and **persist it permanently** on the user profile. The second tenant
+was never wrong; it was invisible. Rumbo's `resolveTenant` walks
+`created_by_id → owner_email → members[]` and returns on the first hit, and its
+`joinTenant` then actively refuses a second membership ("ya perteneces a otra
+organización — sal de ella antes de unirte a una nueva"). An owner who
+legitimately runs two businesses through the same login is locked into
+whichever tenant the resolver saw first, with no error, no prompt, and no way
+out short of a support ticket.
+
+**The fix is two backend calls and one frontend control, not a rewrite of the
+tenant model.**
+
+1. **The resolver stops guessing.** Whatever function today derives the
+   caller's tenant from `created_by_id`/`owner_email`/`members[]` (Rumbo:
+   `resolveTenant`) computes the **full set** of matching tenants, not just the
+   first. If the caller already has a valid `tenant_id` persisted, keep using
+   it — nothing changes for the common case — but return the full candidate
+   list alongside it so the client can offer a switcher whenever
+   `candidates.length > 1`. If nothing is persisted yet and there is exactly
+   one candidate, auto-assign it as before — no reason to interrupt a user who
+   has only ever belonged to one tenant. If nothing is persisted and there is
+   more than one candidate, **do not guess**: return a "choose one" state
+   instead of onboarding or a silent pick.
+2. **A dedicated switch endpoint, server-derived twice.** A new function
+   (Rumbo: `switchTenant`) takes a `tenant_id` from the client and
+   **recomputes the caller's legitimate candidate set from scratch**, the same
+   way the resolver does — it never trusts that an id the client sent is one
+   the caller actually belongs to. A `tenant_id` outside that set gets the
+   exact same refusal as a `tenant_id` that does not exist (this is Module
+   14's tenant-switching clause, §6, applied for real: the endpoint must not
+   become an existence oracle). A valid switch re-derives role the same way
+   first login does — `owner_email` match → owner, `members[]` match → that
+   member's stored role, creator → whatever role the profile already
+   carries — and recomputes `write_access` against the new tenant's licence
+   state. Nothing about the previous tenant is trusted forward.
+3. **One switcher, reachable once it's needed.** A control — account menu,
+   sidebar, wherever the app's chrome has room — lists the caller's tenants by
+   name and marks the active one, visible only when `candidates.length > 1` (an
+   operator with one tenant never sees a control with nothing to do). Picking a
+   different tenant calls the switch endpoint, then **hard-reloads**
+   (`window.location.reload()` once the server call resolves) rather than
+   trying to reset every tenant-scoped hook, list and cache in place — Module
+   14 §6 exists because that in-place reset is exactly where a stale
+   `business_id` survives in a closure, and a reload is the one reset that
+   cannot leave one behind. The same control is what a brand-new, ambiguous
+   login sees instead of the onboarding screen when the resolver reports more
+   than one candidate and nothing persisted yet — same component, two entry
+   points.
+
+**What this does not change.** A tenant's own RLS and every `guardedEntityWrite`
+-style Safe function still key off the **single** `tenant_id` persisted on the
+caller's profile at request time (Module 3, Module 4) — switching writes that
+one field through the same server-authoritative path first login already uses;
+it does not add a second identity or a session that spans two tenants at once.
+An operator is always acting as exactly one tenant; switching only changes
+which one, deliberately, one field write at a time.
+
+**Verify it like every other module: read the deployed behavior, not the
+diff.** Log in as an email that is `owner_email`/creator/member on two tenants
+and confirm: (a) the picker (or switcher) actually lists both, by name; (b)
+switching changes every tenant-scoped screen's data, not just the header; (c)
+requesting a `tenant_id` the caller does not belong to — by editing the call
+directly — gets the same response as a nonexistent id.
+
+---
+
 ## Verification gates — what actually proves a module is live
 
 The recurring failure across this portfolio is not writing the code. It is
@@ -869,6 +944,7 @@ Each module's proof is a thing you can run and read.
 | 14 isolation | no tenant can reach another | the dated audit, naming what could **not** be verified |
 | 15 bridge | each app signs as itself | a full sync with zero `rejected the derived key` in MC's log |
 | 16 secrets | the value is what you think | read it back from the panel, or make a call that only succeeds if it is right |
+| 18 tenant switching | one email reaches every tenant it belongs to, and no other | log in as a multi-tenant email, confirm the picker lists all of them and a foreign `tenant_id` gets the same refusal as a nonexistent one |
 
 ---
 
@@ -907,7 +983,13 @@ Each module's proof is a thing you can run and read.
 15. Set every secret in Module 16's inventory **and read each one back**, then
     prove the whole chain with one *Sincronizar ahora*: an `app_health` row,
     an audit row, and no `rejected the derived key` in Mission Control's log.
-16. Copy `CHECKLIST.md` from this repo into the new app's `CLAUDE.md`.
+16. If the tenant entity's `owner_email`/`members[]` shape lets one email reach
+    more than one tenant, build the Module 18 switcher from day one — the
+    resolver returning every candidate, the dedicated switch endpoint that
+    re-derives the candidate set server-side, and the control itself.
+    Retrofitting it later means every profile that already got silently locked
+    to the wrong tenant needs a one-time nudge to re-resolve.
+17. Copy `CHECKLIST.md` from this repo into the new app's `CLAUDE.md`.
 
 See [`CHECKLIST.md`](CHECKLIST.md) for the compact, copy-pasteable version of
 this list, and [`docs/incidents.md`](docs/incidents.md) for the full postmortems

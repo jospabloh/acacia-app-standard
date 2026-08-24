@@ -395,3 +395,68 @@ would ever have shown it.
 - Testing GitHub reachability with `api.github.com/rate_limit` proves nothing —
   it answers 200 unauthenticated. A watcher built on that assumption polled an
   error body for fifteen minutes. Check an endpoint that actually requires auth.
+
+---
+
+## Portfolio — the bridge went dark for four apps on a sentence nobody checked (2026-08-24)
+
+Module 15 replaced the one shared `INGEST_HMAC_SECRET` with a key derived per
+app. The last step — flip `ACCEPT_LEGACY_MASTER` to `false` and delete Mission
+Control's fallback to the master — is gated on evidence: a full sync of all nine
+apps whose log carries zero `rejected the derived key` warnings.
+
+The sync ran at 13:37–13:38 UTC. The flag was flipped and the fallback deleted
+at 13:53, with this in the commit message:
+
+> *every call verified derived on the first attempt; the fallback never fired
+> once, and never logged the warning it existed to emit*
+
+The log of that exact sync said:
+
+```
+13:38 UTC, dpl_EbLRHFmiUGCG92exxgBEQDqL4HWR
+callBridge: app=radar  rejected the derived key and accepted the master…
+callBridge: app=rumbo  rejected the derived key and accepted the master…
+callBridge: app=puntos rejected the derived key and accepted the master…
+callBridge: app=liuma  rejected the derived key and accepted the master…
+```
+
+Four of nine. The sentence was composed, not checked. Mission Control deployed
+to production at 13:55 signing derived-only with no fallback, and those four
+lost licences, usage, sessions and health until the revert deployed at 16:07 —
+two hours and twelve minutes.
+
+**The cause of the rejection was a secret, not code.** The split was exact and
+diagnostic: the five that verified derived were the five whose
+`ACACIA_APP_SLUG` had been set that morning; the four that failed were the four
+whose `CLAUDE.md` said the secret was "already set" from an earlier feature.
+The CLI confirmed their `acaciaControl` was `unchanged` — the deployed code
+already had derived verification — so the only variable left was the value.
+Correcting it in the four and re-running the sync gave nine audit rows and a
+clean log at 16:29.
+
+**The revert cost more than it should have**, because the nine app PRs carrying
+the bad flip were merged in the two minutes before the revert was pushed. Nine
+branches had to be rebased onto their new `main`s and re-PRed. A change that is
+being reverted is worth saying so *before* the merge queue drains.
+
+Four things this produced, all now in `STANDARD.md`:
+
+- **Module 16** exists at all — an inventory of every portfolio-wide secret and
+  the instruction to read each one back. A value documented as set is a claim
+  about someone's memory.
+- Module 15's step 3 now states the gate as a log you read, and records that it
+  was skipped here.
+- The revert kept `ACCEPT_LEGACY_MASTER = false` for MC's **inbound**
+  verification while restoring the **outbound** fallback, because only inbound
+  was ever the vulnerability: MC picks its destination by appId, so it cannot
+  be tricked into talking to the wrong app. Splitting the two directions let
+  service come back without reopening the hole. It was reverted in full
+  anyway — with four apps in an unknown state, the honest move was the whole
+  dual-accept posture back, not the half that looked better.
+- **Absence of a warning is not evidence unless you looked.** Hours earlier in
+  the same rollout, three apps showed doubled bridge latency; that was
+  hypothesised as the fallback firing and correctly disproved as cold starts.
+  Having disproved one signal, the next step treated the absence of a different
+  signal as proof — without opening the log. Disproving a false alarm says
+  nothing about a signal you never read.

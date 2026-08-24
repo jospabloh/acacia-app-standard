@@ -673,12 +673,15 @@ which is precisely the drift this module removes. `deno lint`'s `no-unused-vars`
 catches it in the three repos that run it; the other six have no deno step, so
 there the only guard is doing it.
 
-**The migration is NOT complete. `ACCEPT_LEGACY_MASTER` is still `true`, and
-four apps are why:** on 2026-08-24 a sync of all nine had radar, rumbo, puntos
-and liuma reject the derived key and fall back to the master. A new app starts
-at `false` regardless — it has no legacy signature in flight. The sequence below
-is the shape to copy the next time a shared secret has to change under a fleet
-that deploys at different times:
+**The migration ran on 2026-08-24 and the flag can now go `false` everywhere:**
+a sync of all nine apps at 16:29 UTC produced nine audit rows and **zero**
+"rejected the derived key" warnings in Mission Control's log for that window.
+That measurement is the gate, and it is the second one — the first attempt at
+the same sync had four apps fall back (below). A new app starts at `false`
+regardless: it has no legacy signature in flight.
+
+The sequence below is the shape to copy the next time a shared secret has to
+change under a fleet that deploys at different times:
 
 1. **Verify both keys, sign with the old one.** Mission Control deploys on
    merge and the apps by hand, so MC is always first. Accepting either key made
@@ -697,14 +700,23 @@ gate is a full sync of every app followed by Mission Control's runtime log for
 that window, containing zero "rejected the derived key" warnings. Anything less
 is a guess.
 
-This is written the way it is because step 3 was taken here on a guess. The
+This is written the way it is because step 3 was first taken on a guess. The
 sync ran, the flag went false and the fallback was deleted, on the strength of
 a sentence — *"every call verified derived on the first attempt and the
 fallback never fired once"* — that was composed rather than checked. The log of
-that very sync named four apps that had fallen back. The four lost their bridge
-until it was reverted twenty minutes later.
+that very sync named four apps that had fallen back: radar, rumbo, puntos and
+liuma. They lost their bridge until it was reverted twenty minutes later, and
+the revert had to be rebased and re-PRed because the bad change had already
+been merged into all nine repos in the meantime.
 
-Two lessons, and the second is the one that generalises:
+The split was informative, which is the point of step 2's log line: the five
+that verified derived were the five whose `ACACIA_APP_SLUG` had just been set;
+the four that failed were the four that "already had it" — a claim inherited
+from their own `CLAUDE.md` files and never once read back. The value was wrong.
+Correcting the secret in those four and re-running the sync produced the clean
+log above.
+
+Three lessons, and the last two generalise past this module:
 
 - **A fallback that names names is worthless if nobody reads what it named.**
   Step 2's whole purpose is to convert an outage into a log line. Skipping the
@@ -715,12 +727,148 @@ Two lessons, and the second is the one that generalises:
   Having disproved a false alarm, the next step was to treat the absence of an
   alarm as proof — without looking. Disproving one signal is not evidence about
   a different one.
+- **"It is already set" is a claim about a value, and a value can be read.**
+  Four apps were documented as configured, in writing, in four files, for days.
+  Nobody had opened the secrets panel. See Module 16.
 
 **Do not give the bridge secret a second job.** Mission Control's `track.js`
 used `INGEST_HMAC_SECRET` as the fallback salt for hashing visitor IPs, so
 rotating the bridge secret would have silently rebucketed every unique-visitor
 count. An auth secret authenticates; anything else that needs a stable random
 string gets its own.
+
+---
+
+## 16. Secrets & configuration — the inventory, and reading it back
+
+Every module above assumes some value is set somewhere. None of them say where,
+and until 2026-08-24 no page in this repo listed them together. That gap has now
+cost the portfolio two separate outages, in opposite directions:
+
+- **A guard that never guarded.** Mission Control's four crons were gated by
+  `if (secret && req.headers.authorization !== ...)`. With `CRON_SECRET` unset,
+  the leading `secret &&` skipped the check entirely — and it *was* unset. An
+  anonymous GET ran the full portfolio sync and returned every app's tenant,
+  licence, ticket and session counts in the body.
+- **A secret that was set to the wrong thing.** Four apps carried
+  `ACACIA_APP_SLUG`, were documented as carrying it, and derived a key that did
+  not match Mission Control's. Nobody had opened the panel to look.
+
+The rule both give you:
+
+> **A config value nobody has read back is not configured. Documentation that
+> says it is set is a claim about someone's memory, not about the system.**
+
+And its corollary, which is Module 11's rule wearing different clothes:
+verifying by content, not by belief, applies to environment as much as to code.
+
+### The portfolio-wide inventory
+
+These are the values that exist because of *this standard*. Anything else an app
+needs (payment keys, wallet certificates, model API keys) is that app's business
+and belongs in its own `CLAUDE.md`.
+
+| value | lives in | why | how to read it back |
+|---|---|---|---|
+| `INGEST_HMAC_SECRET` | Mission Control (Vercel) **and** every app (Base44 secrets) — one identical value portfolio-wide | the master the per-app bridge key is derived from (Module 15) | never used directly any more; a wrong value shows as `bad signature` on every bridge call |
+| `ACACIA_APP_SLUG` | each app (Base44 secrets) | must equal the app's `apps.id` in the bodega, exactly: lowercase, no spaces, no suffix | run a sync and read MC's log for `rejected the derived key` — silence is the pass |
+| `ACACIA_MC_INGEST_URL` | apps that push tickets from a backend function | where `notifyTicketCreated` / `submitTicket` POST (Module 8) | a ticket raised in the app appears in MC within seconds, not at 08:00 UTC |
+| `CRON_SECRET` | Mission Control (Vercel); also apps with their own internal jobs | gates every scheduled endpoint, **fail-closed** — unset must mean 503, never 200 | an anonymous GET to a cron path must not return 200 |
+| `PLATFORM_OWNER_EMAIL` | most apps | the one identity that may run platform-tier functions | a platform function must 403 for any other caller **and** when the value is absent |
+| `TRACK_SALT` | Mission Control | the salt for hashing visitor IPs | — |
+
+**Two names for one idea, and it is still that way.** Three apps call the owner
+identity `PLATFORM_OWNER_EMAIL` (radar, stockflow, kitchops), three call it
+`APP_OWNER_EMAIL` (rumbo, puntos, flowfin), and three use neither because their
+platform tier is a role rather than an address (liuma, cateqhub, ctrlhq). A new
+app uses `PLATFORM_OWNER_EMAIL`. The existing split is recorded here rather than
+renamed, because renaming a secret in six live apps to tidy a name is a change
+with an outage in it and no user on the other side.
+
+### Fail closed, and prove which way it fails
+
+Every guard built on one of these must reject when the value is **missing**, not
+open. This is the single most repeated defect in `docs/incidents.md`: flowfin
+learned it by making `_internalGuard.ts` fail-open and silently disabling three
+crons; Mission Control learned it by leaving four crons wide open in production;
+radar learned it when an emptied `Company` table re-opened a founder-bootstrap
+branch that was supposed to be dead forever.
+
+Write the guard so the unset case is an explicit branch, and then **test that
+branch** — `assert(guard(undefined) === reject)` is one line and it is the line
+that matters.
+
+### When a value has to change
+
+Rotating a shared secret across a fleet that deploys at different times has a
+shape, and Module 15 documents it end to end: accept both, switch the writer
+with a fallback that names names, then flip and delete the fallback **on a
+measurement**. Do not invent a second procedure.
+
+And do not give an auth secret a second job. Mission Control's `track.js` used
+`INGEST_HMAC_SECRET` as the fallback salt for visitor-IP hashing, so rotating
+the bridge key would have silently rebucketed every unique-visitor count.
+Anything that needs a stable random string gets its own.
+
+---
+
+## 17. The Mission Control side — an app is not onboarded until MC knows it
+
+Modules 1–16 are what the app does. This one is what has to change **in Mission
+Control**, and it is the half that gets forgotten, because the app looks
+finished from inside the app.
+
+Registration alone wires the config, not the data path. ctrlhq sat registered
+in MC's `apps` table with its bridge undeployed, so licences, health and tickets
+were all configured and none of them moved.
+
+1. **A row in `apps`** (the bodega) — `id` is the slug the whole standard keys
+   off: `ACACIA_APP_SLUG`, the `app` field in every bridge body, `target_app` in
+   the audit log. `npm run onboard:base44 -- <repoPath> --dry` previews the row.
+2. **An adapter** in `api/_lib/adapters/` — `base44` covers today's whole
+   portfolio; a genuinely new backend kind needs one written.
+3. **`api/_lib/licenseControl.js`** — the app's licence capabilities: its
+   statuses, plans, which fields hold expiry and period end, its billing mode.
+   Miss this and the Licencias panel renders that app's licences with no
+   buttons at all, which is exactly how radar shipped.
+4. **`api/_lib/ticketControl.js`** — where its tickets live and how its thread
+   is shaped, so the operator's queue can read and reply.
+5. **`api/_lib/messaging.js`** — the copy used when MC mails that app's tenants.
+6. **The client catalogue mirror** — `src/lib/licenseCatalog.js` is the browser
+   copy of `licenseCapabilities()`, and `src/lib/licenseCatalog.test.js` fails
+   if the two drift. Adding an app or a status means updating both; there is
+   deliberately no silent way to forget.
+
+**Then confirm the data actually round-trips**, which is not the same as
+confirming the code merged: press *Sincronizar ahora* on the app's page in MC
+and check that `app_health` has a row for it with `status: ok` and that
+`audit_actions` gained a `control:run-sync` for that app. `run-sync` answers 502
+when the bridge throws and writes its audit row only on success, so that row is
+the proof.
+
+---
+
+## Verification gates — what actually proves a module is live
+
+The recurring failure across this portfolio is not writing the code. It is
+believing the code is running: merging deploys nothing on Base44, a checkpoint's
+`git_commit_hash` can match `main` while the served tree lags, a repo `.jsonc`
+is not the deployed schema, and a documented secret can hold the wrong value.
+Each module's proof is a thing you can run and read.
+
+| module | the claim | what proves it |
+|---|---|---|
+| 1 licence lifecycle | only MC writes `billing_status` | no native lifecycle cron in the repo; the field's `rls.write` is admin-only in the **deployed** schema |
+| 3 permissions | the server re-checks, not just the UI | a unit test on the resolver, plus the drift check that regenerates the server copies in CI |
+| 4 RLS | both halves of every rule are right | `npm run validate:rls` in CI, then `list_entity_schemas` — the deployed schema, not the file |
+| 5 health | MC can see the app | an `app_health` row with `status: ok` dated today |
+| 8 support | tickets arrive now, not tomorrow | raise one and watch it appear in MC in seconds |
+| 11 deploy | what you merged is what is served | read the served file's content; `unchanged` from the CLI means deployed already matched |
+| 12 theme | the switcher is the only theme writer | grep for other writers of the theme attribute; there must be none |
+| 13 smoke | the live site is the one you think | `npm run test:smoke` green in Actions, against production |
+| 14 isolation | no tenant can reach another | the dated audit, naming what could **not** be verified |
+| 15 bridge | each app signs as itself | a full sync with zero `rejected the derived key` in MC's log |
+| 16 secrets | the value is what you think | read it back from the panel, or make a call that only succeeds if it is right |
 
 ---
 
@@ -741,9 +889,10 @@ string gets its own.
 7. Wire `appConfig`-style versioning + release script (Module 6).
 8. Build the Account/Danger-zone screen (Module 7) and the Support entry point
    (Module 8) before first tenant onboarding, not after.
-9. Add the `apps/` page on `acaciaco-site` (Module 9) and register the app in
-   Mission Control's `apps` table (`npm run onboard:base44 -- <repoPath> --dry`
-   to preview).
+9. Add the `apps/` page on `acaciaco-site` (Module 9), then do the **whole**
+   Mission Control side (Module 17): the `apps` row, the adapter,
+   `licenseControl.js`, `ticketControl.js`, `messaging.js` and the client
+   catalogue mirror. Registration alone wires the config, not the data path.
 10. Build the login page to the Module 10 bar.
 11. Copy the theme switcher in from [`shared/theme/`](shared/theme/) (Module 12)
     and delete any other theme control.
@@ -751,11 +900,14 @@ string gets its own.
     and point its config at the app's real URL.
 13. Run the Module 14 isolation audit before the **second** tenant exists —
     with one tenant nothing can leak, which is also why nothing gets caught.
-14. Copy [`shared/bridge/acaciaSign.ts`](shared/bridge/acaciaSign.ts) in
-    (Module 15), set `ACACIA_APP_SLUG` to the app's Mission Control id, and
-    start with `ACCEPT_LEGACY_MASTER = false` — the legacy path exists only for
-    apps that predate the derivation.
-15. Copy `CHECKLIST.md` from this repo into the new app's `CLAUDE.md`.
+14. Copy [`shared/bridge/acaciaSign.ts`](shared/bridge/acaciaSign.ts) and its
+    test in (Module 15), set `ACACIA_APP_SLUG` to the app's Mission Control id,
+    and start with `ACCEPT_LEGACY_MASTER = false` — the legacy path exists only
+    for apps that predate the derivation.
+15. Set every secret in Module 16's inventory **and read each one back**, then
+    prove the whole chain with one *Sincronizar ahora*: an `app_health` row,
+    an audit row, and no `rejected the derived key` in Mission Control's log.
+16. Copy `CHECKLIST.md` from this repo into the new app's `CLAUDE.md`.
 
 See [`CHECKLIST.md`](CHECKLIST.md) for the compact, copy-pasteable version of
 this list, and [`docs/incidents.md`](docs/incidents.md) for the full postmortems

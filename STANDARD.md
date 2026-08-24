@@ -673,21 +673,29 @@ which is precisely the drift this module removes. `deno lint`'s `no-unused-vars`
 catches it in the three repos that run it; the other six have no deno step, so
 there the only guard is doing it.
 
-**The migration has an order, and it is the opposite of the obvious one.**
-Verification accepts either key while `ACCEPT_LEGACY_MASTER` is `true`, so
-nothing breaks whoever deploys first. But Mission Control deploys on merge
-while apps deploy by hand, so MC is always first — which is why MC keeps
-*signing* outbound with the master until every app can accept derived.
-Sequence:
+**The migration is complete — `ACCEPT_LEGACY_MASTER` is `false` everywhere as
+of 2026-08-24.** A new app starts there and never carries the legacy path. The
+sequence is kept below because the *shape* is what to copy the next time a
+shared secret has to change under a fleet that deploys at different times:
 
-1. Mission Control verifies per app, still signs with the master.
-2. Every app signs outbound with its derived key and accepts both inbound.
-3. Only then: flip `ACCEPT_LEGACY_MASTER` to `false` everywhere, and switch
-   MC's outbound signing to `signFor`. **This step is the fix** — until it
-   lands, a legacy master signature is still accepted and the hole is open.
+1. **Verify both keys, sign with the old one.** Mission Control deploys on
+   merge and the apps by hand, so MC is always first. Accepting either key made
+   deploy order irrelevant; nothing went dark waiting for the slowest app.
+2. **Switch the signer, keeping a fallback that names names.** MC signed
+   derived and, only on a signature rejection, retried with the master and
+   logged *which* app had rejected it. MC cannot read an app's Base44 secrets,
+   so this was the only way to find a missing or misspelled `ACACIA_APP_SLUG`
+   without taking that app's bridge down to discover it.
+3. **Flip the flag and delete the fallback, in the same commit.** Once the flag
+   is off, a wrong slug must fail rather than degrade — a fallback left behind
+   would be exactly the silent acceptance the whole change removes.
 
-Grep the constant across the portfolio to see who is still on legacy. A new app
-joining after step 3 starts at `false` and never carries the legacy path.
+**Step 3 waits on evidence, not on a feeling that enough time has passed.** Here
+that meant syncing all nine apps one at a time and reading the logs: every call
+verified derived on the first attempt and the fallback never fired once. Two
+apps had shown doubled bridge latency, which looked like the fallback firing —
+it was cold starts. Worth checking rather than flipping on the assumption, and
+worth checking rather than delaying on it.
 
 **Do not give the bridge secret a second job.** Mission Control's `track.js`
 used `INGEST_HMAC_SECRET` as the fallback salt for hashing visitor IPs, so

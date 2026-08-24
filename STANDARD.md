@@ -673,10 +673,12 @@ which is precisely the drift this module removes. `deno lint`'s `no-unused-vars`
 catches it in the three repos that run it; the other six have no deno step, so
 there the only guard is doing it.
 
-**The migration is complete — `ACCEPT_LEGACY_MASTER` is `false` everywhere as
-of 2026-08-24.** A new app starts there and never carries the legacy path. The
-sequence is kept below because the *shape* is what to copy the next time a
-shared secret has to change under a fleet that deploys at different times:
+**The migration is NOT complete. `ACCEPT_LEGACY_MASTER` is still `true`, and
+four apps are why:** on 2026-08-24 a sync of all nine had radar, rumbo, puntos
+and liuma reject the derived key and fall back to the master. A new app starts
+at `false` regardless — it has no legacy signature in flight. The sequence below
+is the shape to copy the next time a shared secret has to change under a fleet
+that deploys at different times:
 
 1. **Verify both keys, sign with the old one.** Mission Control deploys on
    merge and the apps by hand, so MC is always first. Accepting either key made
@@ -690,12 +692,29 @@ shared secret has to change under a fleet that deploys at different times:
    is off, a wrong slug must fail rather than degrade — a fallback left behind
    would be exactly the silent acceptance the whole change removes.
 
-**Step 3 waits on evidence, not on a feeling that enough time has passed.** Here
-that meant syncing all nine apps one at a time and reading the logs: every call
-verified derived on the first attempt and the fallback never fired once. Two
-apps had shown doubled bridge latency, which looked like the fallback firing —
-it was cold starts. Worth checking rather than flipping on the assumption, and
-worth checking rather than delaying on it.
+**Step 3 waits on evidence, and the evidence is a log you actually read.** The
+gate is a full sync of every app followed by Mission Control's runtime log for
+that window, containing zero "rejected the derived key" warnings. Anything less
+is a guess.
+
+This is written the way it is because step 3 was taken here on a guess. The
+sync ran, the flag went false and the fallback was deleted, on the strength of
+a sentence — *"every call verified derived on the first attempt and the
+fallback never fired once"* — that was composed rather than checked. The log of
+that very sync named four apps that had fallen back. The four lost their bridge
+until it was reverted twenty minutes later.
+
+Two lessons, and the second is the one that generalises:
+
+- **A fallback that names names is worthless if nobody reads what it named.**
+  Step 2's whole purpose is to convert an outage into a log line. Skipping the
+  log converts it back.
+- **Watch for the reasoning that runs the wrong way.** Earlier in the same
+  rollout, two apps showed doubled bridge latency and that was taken as a sign
+  of the fallback firing; it was cold starts, checked and dismissed correctly.
+  Having disproved a false alarm, the next step was to treat the absence of an
+  alarm as proof — without looking. Disproving one signal is not evidence about
+  a different one.
 
 **Do not give the bridge secret a second job.** Mission Control's `track.js`
 used `INGEST_HMAC_SECRET` as the fallback salt for hashing visitor IPs, so

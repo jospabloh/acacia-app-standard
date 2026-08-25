@@ -923,6 +923,83 @@ directly — gets the same response as a nonexistent id.
 
 ---
 
+## 19. A shipped security fix needs a guard of its own
+
+Modules 1–18 are about closing a hole. This one is about the hole staying
+closed — because closing it once is not the same job as keeping it closed, and
+this portfolio has now watched a correctly-shipped, correctly-deployed fix get
+silently reverted by a **different, well-meaning debugging session** that had
+no idea the lock it removed was load-bearing.
+
+**The incident.** FlowFin's `User.family_id` field carries a locked
+`rls.write: {user_condition: {role: admin}}` — Module 14 finding #1's fix,
+shipped and verified live. A user reported being stuck on the onboarding
+screen. A separate agent session (Base44's own in-app builder, working
+directly against the live app, outside the git/PR path this fix shipped
+through) diagnosed the symptom, reasoned that this write lock was "stripping
+`family_id` from non-admin reads," and removed it. **That reasoning is not
+just risky, it is factually wrong**: an `rls.write` rule governs write
+eligibility only and has no bearing on what a read returns. Removing the lock
+could not have fixed a read-resolution symptom — and per that session's own
+transcript, it didn't: the user was still stuck afterward, through two more
+rounds of unrelated speculative fixes, while the actual hole (any user can now
+set their own tenant pointer to any value and read that tenant's data) sat
+open in production. It was only caught because a second, independent
+diagnosis re-checked the deployed schema directly instead of trusting either
+session's narrative — and by then the reverted lock had already round-tripped
+into the git source of truth too, so restoring it live was not enough; the
+repo needed the same fix or the next ordinary entity deploy would have
+silently stripped it again.
+
+**Why a rule review is not enough, again — same shape as Module 14, one layer
+up.** The failure here was never a bad RLS rule. It was a **correct** rule,
+removed by someone reasoning about a mechanism they had backwards, under
+symptom pressure, with no visibility into why the rule existed. Nothing about
+this is specific to Base44's builder — it is what happens whenever more than
+one path can write to an app's schema (a git-based agent session, a platform's
+own in-app AI, a teammate under pressure) and a security-relevant lock's
+rationale lives somewhere the person touching it isn't reading.
+
+**What closes this:**
+
+1. **A lock's own field description carries its rationale, not just the
+   module/finding number.** State plainly, in the schema itself, what the
+   field is for, what breaks if it's removed, and — critically — **which
+   operation it governs** (write, not read; or vice versa). An agent
+   inspecting the live schema in isolation, with no access to this repo's
+   `STANDARD.md` or the app's `CLAUDE.md`, should still be unable to
+   misdiagnose the mechanism.
+2. **State the mechanism precisely before touching the control, and verify it
+   before, not after.** "This lock might be related" is not a diagnosis. A
+   write rule cannot produce a read-only symptom and a read rule cannot
+   produce a write failure — if the proposed fix doesn't match that shape,
+   the diagnosis is wrong regardless of how plausible it sounds. Prove which
+   rule is actually implicated with live evidence (reproduce the symptom,
+   isolate to the specific rule) before loosening anything security-relevant,
+   the same evidence bar Module 14 already demands for writing one.
+3. **A "fix" that doesn't resolve the symptom is evidence the diagnosis was
+   wrong, not license to try the next hypothesis on top of it.** The correct
+   response to "I removed the lock and the user is still stuck" is to put
+   the lock back immediately and re-diagnose — not to leave it open while
+   stacking a session-clearing theory, then a frontend-fallback theory, on
+   top. An open security hole is not an acceptable cost of an in-progress
+   debugging session, however urgent the original symptom.
+4. **When more than one surface can write to the same app, a security-relevant
+   schema change on either surface must be checked against the other
+   immediately.** Restoring a lock live (via a direct schema-edit path) is not
+   done until the git-tracked schema file agrees — otherwise the next routine
+   deploy from whichever surface didn't get the memo silently undoes the fix,
+   and the drift can sit unnoticed until the next audit.
+5. **Roll this into the Module 14 re-audit.** Every lock that audit already
+   requires (Module 1's `billing_status`, Module 14's own field locks, a
+   `business_id`/`family_id`-equivalent tenant pointer) gets checked for drift
+   at the same cadence: deployed schema vs. repo file, not just "is the rule
+   present" but "does it still say what it said last time," because a lock
+   that silently loosened between audits is indistinguishable from one that
+   was never tightened.
+
+---
+
 ## Verification gates — what actually proves a module is live
 
 The recurring failure across this portfolio is not writing the code. It is
@@ -945,6 +1022,7 @@ Each module's proof is a thing you can run and read.
 | 15 bridge | each app signs as itself | a full sync with zero `rejected the derived key` in MC's log |
 | 16 secrets | the value is what you think | read it back from the panel, or make a call that only succeeds if it is right |
 | 18 tenant switching | one email reaches every tenant it belongs to, and no other | log in as a multi-tenant email, confirm the picker lists all of them and a foreign `tenant_id` gets the same refusal as a nonexistent one |
+| 19 lock survives debugging | a shipped security lock is still on | deployed schema still shows it, repo file agrees with the deployed schema, and its description still states the rationale |
 
 ---
 

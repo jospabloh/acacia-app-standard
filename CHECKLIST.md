@@ -118,7 +118,18 @@ jospabloh/acacia-app-standard. Status:
       there is more than one candidate, and a successful switch hard-reloads
       rather than resetting tenant-scoped state in place.
 
+- [ ] Module 19 — Lock survives debugging: every security-relevant RLS/field
+      lock this app has (Module 1's `billing_status`, Module 14's tenant-pointer
+      locks, etc.) states its rationale AND which operation it governs (write
+      vs. read) in its own field description — not just in this file. Checked
+      for drift at the same cadence as the Module 14 re-audit: deployed schema
+      still has it, repo file agrees with the deployed schema. A "fix" for an
+      unrelated symptom that touches one of these locks is verified against the
+      lock's actual mechanism (a write rule cannot explain a read symptom, or
+      the reverse) before it ships, live or otherwise.
+
 Last audited against the standard: <date> — <what changed / what's still open>
 Last multi-tenant isolation audit: <date> — <scope, findings, what's unverified>
 Secrets last read back: <date> — <which ones, and how each was proven>
+Security locks last checked for drift (Module 19): <date> — <deployed vs. repo, any found open>
 ```

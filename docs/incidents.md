@@ -5,6 +5,57 @@ Postmortems from across the portfolio that turned into a rule in
 standard stays a contract, not a story — but the story is why each rule exists,
 so read the relevant one before arguing a rule doesn't apply to your case.
 
+## FlowFin — a security fix reverted by a second, uncoordinated agent (2026-08-25)
+
+A user (`roseta.cafeteria@gmail.com`, Mochi Family) reported being stuck on
+the onboarding screen — "create a family or join one by code" — despite
+already belonging to one. Two independent investigations ran on the same app
+at the same time without either knowing about the other: a Claude Code
+session working through git/PRs, and Base44's own in-app AI builder, invoked
+directly against the live app.
+
+The Claude Code session confirmed the user's stored data was clean —
+`FamilyMembership.status: 'approved'`, `family_id` matching on both the
+membership row and `User.data.family_id` — and the deployed `FamilyMembership`
+RLS correctly allowed her to read her own row (`data.user_id ===
+{{user.id}}`). That ruled out both a data bug and an isolation bug; the
+remaining live lead was a stale frontend build never reaching the user's
+custom domain, still unresolved when this incident overtook it.
+
+The in-app builder, working from the same symptom with no visibility into
+that investigation, reasoned instead that the field-level `rls.write` lock on
+`User.family_id` — Module 14 finding #1's fix, shipped and deployed the day
+before — was "stripping `family_id` from non-admin reads," and removed it.
+**That reasoning does not hold**: a field's `rls.write` rule governs write
+eligibility only; it has zero effect on what a read returns. Removing the
+lock could not have fixed a read-resolution symptom, and it didn't — the user
+was still stuck afterward, through a stale-session-clearing attempt and
+finally a real fix (a client-side fallback to service-role-backed backend
+functions when a direct entity read comes back empty, which the user
+confirmed worked). Meanwhile the lock stayed off: any authenticated user
+could set their own `family_id` to an arbitrary value and read that family's
+data through every `family_id`-keyed RLS rule in the app — the exact hole
+Module 14 finding #1 existed to close, reopened by a session chasing an
+unrelated symptom, framed by the user afterward as "your dumb security
+checks" having caused the outage in the first place.
+
+Caught only because a later pass re-read the **deployed** schema directly
+instead of trusting either session's account of what it had done — by which
+point the revert had round-tripped into the git-tracked schema file too, via
+this platform's own bidirectional sync, so restoring it live was necessary
+but not sufficient; the repo needed the identical fix or the next routine
+`entities deploy` would have silently stripped it again.
+
+Generalized into Module 19: a security-relevant RLS lock's own field
+description must state its rationale and, critically, which operation it
+governs — write vs. read are not interchangeable, and a fix proposed against
+the wrong one is wrong regardless of how plausible it sounds. A "fix" that
+doesn't resolve the reported symptom is evidence the diagnosis was wrong, not
+license to leave the hole open while trying the next theory. And wherever
+more than one path can write to an app's schema, a security-relevant change on
+either side needs to be checked against the other immediately — not left to
+the next audit to discover the drift.
+
 ## StockFlow — permission bypass via direct entity write (fixed 2026-08-17)
 
 RLS only enforced tenant isolation, never the app's granular permission keys

@@ -122,6 +122,25 @@ Then, still server-side, check the account's `billing_status` (`view_only` /
 `suspended` → reject, same gate every other write already has) *before* the
 permission check would otherwise allow it.
 
+**The registry needs an admin-facing screen, not just a registry file.** A
+`permissionRegistry.js` that only ever gets *read* by `can()` hooks is a
+developer-only artifact — the tenant's own admin has no way to see or change
+what a role can do without filing a support ticket. Ship a "Permisos" page
+(pattern: FlowFin's `src/pages/PermissionAdmin.jsx`) gated to the tenant admin
+(and platform-owner) that renders the **same registry** as a matrix — one row
+per module/section, one column per action (ver/crear/modificar/eliminar,
+whatever the app's `PERMISSION_COLUMNS` are) — with a tri-state group checkbox
+per module (on/off/mixed across its sections) plus per-section overrides, an
+explicit edit/read-only toggle so browsing the matrix can't fat-finger a
+change, and each toggle persisted immediately to the same per-tenant
+`RolePermission`-equivalent entity the server-side re-check already reads —
+never a second config surface the backend doesn't consult. This is what turns
+Module 3 from "the developer encoded a default" into "the admin approved
+what their own team can see and do," and it is the natural place to surface
+*everything the app manages and shows*, module by module, rather than a
+tenant admin discovering a section exists only when a member reports they
+can't see it.
+
 **Why this is non-negotiable, not a nice-to-have:** stockflow shipped exactly
 the client-only version first, for three entities, across two release cycles,
 before closing it — an authenticated low-privilege user could open devtools and
@@ -239,6 +258,44 @@ user, containing at minimum:
 - Current `billing_status` and plan, read-only (Module 1 owns writing it) —
   don't let this screen invite the user to self-serve a status change that
   bypasses Mercado Pago.
+
+**The danger zone is two different scopes, and an app that only ships one has
+only half of it.** "Delete my account" (leave the tenant, drop *my own*
+membership) is not the same operation as "delete the tenant" (the whole
+family/business/organization, every other member's access with it), and a
+member-scoped delete button is not a substitute for a tenant-scoped one —
+FlowFin shipped exactly the first and not the second: `AccountSettings.jsx`'s
+danger zone removes the caller's own `FamilyMembership` and disconnects them,
+but there is no path anywhere in the app for a tenant admin to delete the
+*tenant itself*, hand it to someone else, or promote a member to admin
+without going through ACACIA. A tenant admin needs all three, gated to
+`role: admin`-of-that-tenant (never a platform-wide check) and each behind
+its own confirmation step:
+- **Delete tenant.** Irreversible, same cascade-or-document rule as account
+  deletion above, but for every entity the *tenant* owns — every member loses
+  access, not just the admin. This is the operation Mission Control's own
+  danger zone (`api/_lib/control/license-record.js`'s `purge`) deliberately
+  does **not** perform on your app's data — see Module 0: your app is the
+  source of truth, so only your app can do a real delete, and only your app's
+  own admin should be able to trigger it.
+- **Delegate the tenant** (transfer ownership/admin to another existing
+  member). Re-derive the target from the tenant's own membership list
+  server-side — never trust a user id the client sent — and require the
+  target to already be an approved member, the same "an id in the request
+  body is not proof of anything" discipline Module 14 demands of every other
+  cross-tenant-shaped write. The outgoing admin either keeps a regular-member
+  role or is removed, an explicit choice the confirmation step should state,
+  not an implicit side effect.
+- **Promote a member to tenant admin** (without necessarily transferring
+  sole ownership — an app whose role model supports more than one admin per
+  tenant, Module 2). Same server-side re-derivation as delegation: the actor
+  must already be that tenant's admin, and the target must already be an
+  approved member of the *same* tenant, checked against the stored
+  membership record, not the request.
+
+None of this is Mission Control's job — Module 1 already draws that line for
+billing, and it holds here too: a *tenant's own* leadership changes belong to
+the tenant's own admin, in the tenant's own app, the same way a delete does.
 
 ---
 
@@ -1000,6 +1057,102 @@ rationale lives somewhere the person touching it isn't reading.
 
 ---
 
+## 20. Session control — inactivity timeout, one active device, stale sessions reaped
+
+Every app logs users out on its own, in three layers that catch different
+failure modes. A client-side idle timer alone only protects the tab that is
+still open and running JavaScript; it does nothing for a laptop that was
+closed mid-session or a phone whose browser was killed by the OS. All three
+layers are the module, not any one of them.
+
+**Layer 1 — client-side inactivity.** A warning dialog after a fixed idle
+period, then a hard logout shortly after if nobody responds. Canonical
+implementation: [`shared/session/`](shared/session/), lifted from FlowFin's
+`useSessionManager.js` (20 min idle → warning, 2 min countdown → logout,
+`IdleWarningDialog.jsx` shows the countdown live) and
+`IdleWarningDialog.jsx`/`SessionExpiredDialog.jsx`'s explicit re-auth choice
+(log back in, or fully sign out). Copy these in unchanged, the same discipline
+as Module 12's theme switcher and Module 15's bridge signer — an app that
+edits its own copy in place drifts, and an operator running two ACACIA apps
+should meet the same warning at the same threshold in both. Activity is
+tracked with a throttled `useActivityTracker` (FlowFin: one write per hour,
+not per keystroke) so the idle timer resets from real DOM events without
+hammering the backend.
+
+**Layer 2 — one active device per user, surfaced, not silently blocked.**
+Track a `Session` (or equivalent) row per `(user, device_id)`, updated on
+every heartbeat. Logging in from a new device marks that device `active` and
+demotes the user's other `active` sessions to `passive` — the older device
+keeps working (this is "control de sesiones al mismo tiempo con el mismo
+usuario": the app tracks and can act on concurrency, not that it locks a user
+to one device against their will) but the app can now show "también activo
+en: iPhone, hace 3 min" and let the user revoke a device they don't
+recognize. A device the user has never authorized appearing in that list is
+the whole point of tracking this at all — it is a account-compromise signal
+Module 7's danger zone should surface, not bury in a table nobody reads.
+
+**Layer 3 — stale sessions get reaped on the server, not just abandoned.**
+This is the gap Layer 1 structurally cannot close: a session whose client
+never sends another heartbeat (device died, battery drained, browser killed
+outright) sits `active`/`passive` forever with no client left to run the idle
+timer. A scheduled job (pattern:
+[`shared/session/purgeStaleSessions.example.ts`](shared/session/README.md))
+revokes any session whose `last_seen` is older than a fixed threshold —
+**48 hours** is the portfolio default (long enough that a legitimate
+multi-day-away laptop sleep doesn't get logged out from under someone, short
+enough that a dead session doesn't sit "active" for weeks). Revoking sets
+`status: 'revoked'`, which `sessionHeartbeat`'s own check (FlowFin:
+`if (found.status === 'revoked') return 403`) already turns into a forced
+re-auth the next time that device's tab wakes up — no separate client change
+needed, the guard rail was already there for Mission Control's own
+remote-force-logout path (see FlowFin's `CLAUDE.md`, 2026-08-05 changelog
+entry) and this reuses it for the timed case.
+
+**What this is not.** Layer 2's "one active device" is a UI/UX signal, not
+an access-control boundary — it does not replace Module 3's server-side
+permission re-check, and a `passive` device is not blocked from working, only
+flagged as not-the-most-recent. Don't build a second auth gate out of it.
+
+---
+
+## 21. About screen — user manual, changelog, version, contact, and the ACACIA line
+
+Every app has one screen — reachable from account/settings, not buried —
+that answers "what does this app do, what changed recently, what version am
+I on, and who do I ask." Canonical shape: FlowFin's `About.jsx` +
+`UserManual.jsx`, four things on one surface:
+
+- **A user manual.** Searchable, in-app, sectioned by feature area (FlowFin:
+  an accordion, one entry per module, plain-language "how do I…" content —
+  not API docs, not a README). This is the thing that turns a support ticket
+  ("how do I split an expense?") into something the user answers themselves,
+  and it is the natural home for anything Module 3's new permission-admin
+  screen (above) doesn't already make self-evident from the UI itself.
+- **The changelog, surfaced where the user already is.** Module 6 owns
+  *generating* `APP_VERSION`/`RELEASE_DATE`/the changelog array; this module
+  is where it gets *read* — "Novedades v`{currentVersion}`" front and center,
+  a collapsible full version history behind it. Don't build a second
+  changelog UI a release script has to remember to also update — this screen
+  reads the same array Module 6 already produces.
+- **Version, unambiguous.** The number on this screen, in `package.json`,
+  and in the update-available banner (FlowFin: `AppUpdateBanner.jsx`) must
+  be the same line — Module 6 already flags what happens when they drift
+  ("se corrige el desfase histórico del número de versión").
+- **Contact, and the line that says whose app this is.** Support email and a
+  direct channel (FlowFin: WhatsApp) that actually reaches someone — not a
+  form into a void, and not a duplicate of Module 8's ticket system, just the
+  fastest path to it. And a short acknowledgment that this is an ACACIA
+  product: the ACACIA mark, "Hecho con ♥ para \<the app's actual users\>,"
+  rights/licensing line. Small, but it is the one place in the whole app that
+  says who stands behind it, and it costs one card on a settings screen.
+
+None of these four are Mission Control's to build — the panel operates the
+*portfolio*, not any single tenant's day-to-day, and a user asking "how do I
+use this" or "who do I call" should never have to know Mission Control
+exists.
+
+---
+
 ## Verification gates — what actually proves a module is live
 
 The recurring failure across this portfolio is not writing the code. It is
@@ -1023,6 +1176,8 @@ Each module's proof is a thing you can run and read.
 | 16 secrets | the value is what you think | read it back from the panel, or make a call that only succeeds if it is right |
 | 18 tenant switching | one email reaches every tenant it belongs to, and no other | log in as a multi-tenant email, confirm the picker lists all of them and a foreign `tenant_id` gets the same refusal as a nonexistent one |
 | 19 lock survives debugging | a shipped security lock is still on | deployed schema still shows it, repo file agrees with the deployed schema, and its description still states the rationale |
+| 20 session control | idle logs out, stale sessions get reaped | wait past the idle threshold and confirm the warning/logout fires; check a session whose `last_seen` is older than 48h flips to `revoked` after the reap job runs |
+| 21 about screen | version/changelog/manual/contact are one screen, in sync | the version shown matches `package.json` and the update banner; the changelog entry for the current version is non-empty |
 
 ---
 
@@ -1067,7 +1222,14 @@ Each module's proof is a thing you can run and read.
     re-derives the candidate set server-side, and the control itself.
     Retrofitting it later means every profile that already got silently locked
     to the wrong tenant needs a one-time nudge to re-resolve.
-17. Copy `CHECKLIST.md` from this repo into the new app's `CLAUDE.md`.
+17. Copy [`shared/session/`](shared/session/) in (Module 20): the idle
+    warning/logout pair, the activity-tracking heartbeat, the per-device
+    `Session` entity with the active/passive model, and the stale-session
+    reap job at the 48h default.
+18. Build the About screen (Module 21) — user manual, the changelog surfaced
+    from Module 6's own generated array, the version line kept in sync with
+    `package.json`, and a contact + ACACIA acknowledgment card.
+19. Copy `CHECKLIST.md` from this repo into the new app's `CLAUDE.md`.
 
 See [`CHECKLIST.md`](CHECKLIST.md) for the compact, copy-pasteable version of
 this list, and [`docs/incidents.md`](docs/incidents.md) for the full postmortems

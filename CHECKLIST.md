@@ -22,6 +22,10 @@ jospabloh/acacia-app-standard. Status:
       re-check on every write path (permission key, in the same precedence
       order as the client), gated behind billing_status too. No entity is
       written to directly from the client without a Safe-function equivalent.
+      An admin-facing "Permisos" screen renders that same registry as a
+      matrix (module x action, tri-state group + per-section overrides) so
+      the tenant's own admin can see and approve what each role can do,
+      instead of a registry file only the client hides/disables UI from.
 - [ ] Module 4 — RLS: every tenant-scoped entity has the four-op `$or` shape
       (tenant branch + service-role admin branch), both halves of every rule
       verified (data.* on the entity side, {{user.data.*}} on the user side).
@@ -33,6 +37,12 @@ jospabloh/acacia-app-standard. Status:
       generated only by the release script, never by the routine build.
 - [ ] Module 7 — Account & danger zone: member management gated by Module 3,
       data export, irreversible delete with a real confirmation step.
+      Danger zone covers BOTH scopes, not just one: "delete my account"
+      (leave the tenant) is separate from "delete the tenant" (every
+      member loses access), plus delegate/transfer tenant admin to another
+      approved member and promote a member to tenant admin — all three
+      re-derive actor and target from the tenant's own stored membership,
+      never from the request body.
 - [ ] Module 8 — Support/mejoras: entry point writes to this app first, then
       syncs into Mission Control's tickets/leads bodega. No parallel triage UI.
       EVERY place a ticket is born (support page AND the danger zone's deletion
@@ -127,6 +137,17 @@ jospabloh/acacia-app-standard. Status:
       unrelated symptom that touches one of these locks is verified against the
       lock's actual mechanism (a write rule cannot explain a read symptom, or
       the reverse) before it ships, live or otherwise.
+
+- [ ] Module 20 — Session control: client-side idle warning + hard logout
+      (`shared/session/`), a per-device Session with the active/passive
+      model so a user can see and revoke concurrent devices, and a
+      server-side reap job that revokes any session idle past 48h — the
+      layer the client-side timer structurally cannot reach.
+
+- [ ] Module 21 — About screen: an in-app user manual, the changelog from
+      Module 6 surfaced where the user already is (current version's
+      changes + collapsible history), the version line in sync with
+      package.json, and a contact + ACACIA acknowledgment card.
 
 Last audited against the standard: <date> — <what changed / what's still open>
 Last multi-tenant isolation audit: <date> — <scope, findings, what's unverified>

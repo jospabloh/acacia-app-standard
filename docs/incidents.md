@@ -5,6 +5,34 @@ Postmortems from across the portfolio that turned into a rule in
 standard stays a contract, not a story — but the story is why each rule exists,
 so read the relevant one before arguing a rule doesn't apply to your case.
 
+## Rumbo — an unconfigured login provider locked a new user out entirely (2026-08-26)
+
+Feedback from two prospective users trying to join a live tenant ("Car-Go
+Rent") surfaced three unrelated problems in the same WhatsApp thread; this is
+the one that generalized into a rule. One of them (Fer Díaz) tapped
+"Continuar con Apple" on Rumbo's login screen and got Base44's raw platform
+error back verbatim: `Apple authentication is not enabled for this app.
+Please contact the app admin for access.` — Sign in with Apple had never
+actually been configured for this app. No account was ever created for that
+email; querying the app's own `User` entity directly confirmed it — there
+was nothing to notice was missing until the person locked out said so by
+hand. The button had been there, unconditionally, since the login screen was
+built to Module 10's bar — nothing checked whether the provider behind it
+was actually live before showing it.
+
+The other two problems from the same feedback were unrelated causes (the
+tenant's own vehicle-limit override sat below its plan's real default, and a
+client-side error wrapper was swallowing the real message behind a generic
+HTTP status code on every guarded write) — see Rumbo's own `CLAUDE.md` for
+those. This one generalized cleanly because the shape isn't Rumbo-specific:
+a login screen gets built once, against whichever providers happen to be
+enabled at the time, and nothing revisits that list later when a provider
+quietly isn't wired up (or never was).
+
+Generalized into Module 10: every social login button shown must correspond
+to a provider actually enabled for that Base44 app, checked at build time —
+not discovered by a user it locks out.
+
 ## FlowFin — a security fix reverted by a second, uncoordinated agent (2026-08-25)
 
 A user (`roseta.cafeteria@gmail.com`, Mochi Family) reported being stuck on

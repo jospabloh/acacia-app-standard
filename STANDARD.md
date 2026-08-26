@@ -452,6 +452,20 @@ company. Concretely, "pro" means:
   rate-limit/lockout feedback if you have one.
 - No dead ends: a link to request access / start a trial (→ the app's
   `acaciaco-site` page), and to support (Module 8) for a locked-out tenant.
+- **Never show a social login button for a provider that isn't actually
+  enabled on the backend.** `loginWithProvider('apple', ...)` against a
+  provider Base44 hasn't configured for this app doesn't degrade gracefully
+  — it throws the platform's raw error (`Apple authentication is not enabled
+  for this app. Please contact the app admin for access.`) before any
+  account exists, so tapping it is a dead end at the very first screen, with
+  nothing the user can do about it and no account for the app's own owner to
+  even find and debug. Found in Rumbo (`docs/incidents.md`): a prospective
+  tenant employee tapped "Continuar con Apple," hit exactly that error, and
+  never got an account at all — invisible until the user reported it by
+  hand, because there was no account to notice was missing. Every social
+  button offered must correspond to a provider actually configured for that
+  Base44 app; one that isn't gets removed from the UI, not left for a user
+  to discover is dead.
 - Dark-theme correct by default, like every other screen (Module 9's
   dark-theme rule applies here too — a login page is the worst place for a
   washed-out unstyled color to show up first).

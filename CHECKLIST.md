@@ -68,7 +68,10 @@ jospabloh/acacia-app-standard. Status:
       fields calling loginViaEmailPassword/loginWithProvider directly) —
       NEVER a redirect to Base44's default hosted login. On-brand, real
       error/suspended/view_only states, links to trial and support,
-      dark-theme correct.
+      dark-theme correct. Every social button shown corresponds to a
+      provider actually enabled on the Base44 app — an unconfigured one
+      (e.g. Apple when it isn't set up) is removed, never left for a user
+      to tap into a dead end.
 
 - [ ] Module 11 — Deploy discipline: `base44.app.json` + `npm run deploy`
       (refuses `--app-id`), `deploy:site` for the frontend (merging to `main`

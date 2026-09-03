@@ -133,18 +133,28 @@ jospabloh/acacia-app-standard. Status:
       Sincronizar ahora and confirm an `app_health` row with `status: ok` and a
       `control:run-sync` audit row for this app.
 
-- [ ] Module 18 — Multi-tenant account switching: the resolver that derives a
-      caller's tenant from creator/owner_email/members[] computes the FULL set
-      of matches, not just the first, and returns it alongside whatever is
-      already persisted — a persisted, still-valid tenant_id keeps winning, an
-      unambiguous single candidate still auto-assigns, and only true ambiguity
-      (no persisted tenant_id, 2+ candidates) blocks on a choice instead of
-      guessing. A dedicated switch endpoint re-derives the caller's candidate
-      set from scratch server-side (never trusts the requested tenant_id) and
-      answers a tenant the caller doesn't belong to with the exact same
-      refusal as a nonexistent one. The switcher control is visible only when
-      there is more than one candidate, and a successful switch hard-reloads
-      rather than resetting tenant-scoped state in place.
+- [ ] Module 18 — Multi-tenant account switching AND joining, on a first-class
+      `Membership` entity (CtrlHQ's shape — one row per `(tenant_id, user_id,
+      role)`, `read` keyed on `{{user.id}}`), not an embedded
+      `owner_email`/`members[]` array: the resolver computes the FULL set of
+      a caller's tenants, not just the first, and returns it alongside
+      whatever is already persisted — a persisted, still-valid tenant_id keeps
+      winning, an unambiguous single candidate still auto-assigns, and only
+      true ambiguity (no persisted tenant_id, 2+ candidates) blocks on a
+      choice instead of guessing. Joining a tenant by invite code ALWAYS
+      succeeds regardless of how many other tenants the caller already
+      belongs to — the only refusal is already-a-member-of-*this*-tenant,
+      never "you belong to a different one, leave it first" — and a
+      successful join immediately moves the caller into the newly joined
+      tenant. The join/create screen is reachable from inside the app (an
+      account-menu/sidebar "crear o unirme a otro" entry), not gated
+      exclusively on "no tenant yet". A dedicated switch endpoint re-derives
+      the caller's candidate set from scratch server-side (never trusts the
+      requested tenant_id) and answers a tenant the caller doesn't belong to
+      with the exact same refusal as a nonexistent one. The switcher control
+      is visible only when there is more than one candidate, and a successful
+      switch or join hard-reloads rather than resetting tenant-scoped state in
+      place.
 
 - [ ] Module 19 — Lock survives debugging: every security-relevant RLS/field
       lock this app has (Module 1's `billing_status`, Module 14's tenant-pointer
@@ -166,6 +176,25 @@ jospabloh/acacia-app-standard. Status:
       Module 6 surfaced where the user already is (current version's
       changes + collapsible history), the version line in sync with
       package.json, and a contact + ACACIA acknowledgment card.
+
+- [ ] Module 22 — Server-authoritative diffing: any backend function that
+      compares a server-authoritative custom field (tenant_id,
+      write_access, billing_status, …) against a target value to decide
+      whether to write it does a FRESH read via `asServiceRole` first and
+      diffs against THAT — never against `auth.me()`'s own `user.data`/
+      `user.role`, which is cached/session-scoped and can disagree with what
+      is actually persisted. Rumbo's `switchTenant` returned `ok: true`
+      while silently skipping the write for days on exactly this mistake.
+      A partial `data:{...}` patch spreads the full fresh-read object
+      underneath it, never just the changed keys.
+
+- [ ] Module 23 — Nav survives reload: the left sidebar/nav's active item is
+      derived from the current route on every render, not from mount-time
+      state, so the highlight is correct on the very first frame after a
+      full-page reload (Module 18's switch/join flow deliberately triggers
+      one). Any manually-set nav UI state that isn't route-derived (an
+      expanded group, a scroll position) persists across a reload via
+      `sessionStorage`, restored synchronously on mount.
 
 Last audited against the standard: <date> — <what changed / what's still open>
 Last multi-tenant isolation audit: <date> — <scope, findings, what's unverified>

@@ -1300,6 +1300,105 @@ exists.
 
 ---
 
+## 22. A server-authoritative field must never be verified against the auth session's own cached view
+
+**The gap this closes.** Half a dozen functions in Rumbo alone share one
+shape: read `user` from `auth.me()`, compare a server-authoritative custom
+field on it (`user.data.tenant_id`, `user.data.write_access`, …) against a
+target value, and skip the write when they already match — an "only send
+what changed" optimization that looks harmless and was written with good
+reason (Module 18 already warns that a wholesale `data:{...}` replace can
+wipe sibling fields). It stopped being harmless the day one account's
+`auth.me()` response for that field diverged from what was actually
+persisted: a stray root-level `tenant_id` field, left over from an earlier
+attempted fix that wrote flat instead of nested, made `auth.me()`
+reconstruct `.data.tenant_id` from the wrong source. From that point,
+`switchTenant` received a request to move the account to tenant B while
+`auth.me()` already reported it as being on tenant B — the diff came back
+empty, the write was skipped, and the function returned `ok: true` having
+changed nothing. Nothing in the response revealed this. Two rounds of
+plausible-sounding fixes (moving the field between the document root and
+`data`, reasoning about an atomic-update role conflict that turned out to
+be real but insufficient) came and went before the actual mechanism was
+caught — by instrumenting the function to log its own write attempts and
+re-read the record within the same request, not by reasoning about the
+document's shape from outside.
+
+**Why this is a general risk, not a one-off contamination.** `auth.me()` is
+convenient precisely because it is cached/session-scoped — that is what
+makes it cheap to call on every request. That same property makes it the
+wrong source for "did this already happen" whenever the answer decides
+whether to write. Any field this portfolio treats as server-authoritative
+(`rls.write: false`, set only by a backend function — Module 1's
+`billing_status`, Module 14's tenant-pointer locks, Module 18's
+`tenant_id`/`driver_profile_id`/`write_access`) is exactly the kind of field
+a diff-then-skip optimization is tempting to add around, and exactly the
+kind of field where a stale or contaminated cached read makes the
+optimization silently swallow the one write that mattered. `ok: true` proves
+the function ran to completion — it does not prove anything was written.
+
+**What closes this:**
+
+1. Any function that reads a server-authoritative custom field to decide
+   whether to write it does a fresh read via `asServiceRole`
+   (`svc.entities.User.filter({id: user.id})` or equivalent) **first**, and
+   uses that value — never `auth.me()`'s own `user.data`/`user.role` — for
+   the comparison. `auth.me()` remains fine for identity (`user.id`,
+   `user.email`) and anything genuinely read-only.
+2. The "only send changed fields" optimization stays, but stays correct: the
+   patch is built by spreading the **full fresh-read object** underneath the
+   changed keys (`{...freshData, ...patch}`), never assumed safe because the
+   comparison "looked" unchanged.
+3. The same rule applies one layer up whenever a caller's own
+   server-authoritative field (not just the write target's) gates the
+   operation — e.g. deriving *which* tenant an admin action should scope to
+   from the caller's own `tenant_id`. A stale read there doesn't just skip a
+   write, it can scope an entire operation against the wrong record.
+4. When a write "isn't taking" and the response says `ok: true`, the first
+   thing to check is whether the write executed at all — log the attempt and
+   re-read the record within the same request — before theorizing about the
+   shape of the document. A temporary diagnostic entity (delete it once the
+   root cause is found) settles this in one round-trip instead of another
+   round of plausible-sounding guesses.
+
+---
+
+## 23. Client navigation chrome survives a reload — a full-page reload is routine, not a reset signal
+
+**The gap this closes.** A left sidebar/nav that highlights the active
+section, or remembers which group is expanded, is only correct if it
+re-derives that state on every render — including the render right after a
+full-page reload. A reload is not a rare event this portfolio treats
+casually: Module 18's switch/join flow *deliberately* triggers one
+(`window.location.reload()`) rather than resetting tenant-scoped state in
+place, and a session refresh, a license-status refetch, or the user simply
+pressing F5 all do the same. A nav whose active-item/scroll/expanded state
+only gets set once, at mount, from something that isn't the current route —
+a `useState` seeded from nothing, an animation that runs once on first paint
+— visibly snaps back to its default (top of the list, first group collapsed
+or expanded, no item highlighted) on every one of those reloads, even though
+nothing about where the user actually is in the app changed.
+
+**What closes this:**
+
+1. The active section/item in the nav is derived from the current route on
+   **every** render (a selector over the router's current path), never from
+   mount-time state alone — so the highlight is right from the very first
+   frame after a reload, before anything async resolves.
+2. Any nav UI state that is *not* purely route-derived — a manually
+   expanded/collapsed group, a scroll position inside a long menu — persists
+   across a reload via `sessionStorage` (survives a reload without leaking
+   across tabs or devices the way `localStorage` or a backend field would),
+   keyed by a stable string, and is restored synchronously on mount so there
+   is no flash of the default state before the real one applies.
+3. A reload's job is to reset **data/tenant-scoped** state cleanly (that is
+   the entire reason Module 18's switch flow uses one) — never chrome or
+   navigation state the user didn't ask to reset. Those are two different
+   kinds of "start over," and an ordinary refresh should only ever trigger
+   the first.
+
+---
+
 ## Verification gates — what actually proves a module is live
 
 The recurring failure across this portfolio is not writing the code. It is
@@ -1325,6 +1424,8 @@ Each module's proof is a thing you can run and read.
 | 19 lock survives debugging | a shipped security lock is still on | deployed schema still shows it, repo file agrees with the deployed schema, and its description still states the rationale |
 | 20 session control | idle logs out, stale sessions get reaped | wait past the idle threshold and confirm the warning/logout fires; check a session whose `last_seen` is older than 48h flips to `revoked` after the reap job runs |
 | 21 about screen | version/changelog/manual/contact are one screen, in sync | the version shown matches `package.json` and the update banner; the changelog entry for the current version is non-empty |
+| 22 server-authoritative diffing | a write decision never trusts `auth.me()`'s cached view | grep every backend function for `user.data`/`caller.data`/`user.role` used in a comparison that gates a write — none should exist outside a fresh `asServiceRole` read |
+| 23 nav survives reload | the sidebar's active item and any manual expand/scroll state look right on the first frame after a reload | hard-reload on a deep route and confirm the highlight is correct immediately, then expand a group, reload again, confirm it's still expanded |
 
 ---
 
@@ -1381,7 +1482,14 @@ Each module's proof is a thing you can run and read.
 18. Build the About screen (Module 21) — user manual, the changelog surfaced
     from Module 6's own generated array, the version line kept in sync with
     `package.json`, and a contact + ACACIA acknowledgment card.
-19. Copy `CHECKLIST.md` from this repo into the new app's `CLAUDE.md`.
+19. Every backend function that diffs a server-authoritative custom field
+    before writing it reads that field fresh via `asServiceRole` first
+    (Module 22) — never off `auth.me()`'s own `user.data`/`user.role`.
+20. The left nav derives its active item from the current route on every
+    render, and persists any non-route-derived UI state (expanded groups,
+    scroll position) via `sessionStorage`, restored synchronously on mount
+    (Module 23) — so a reload never visibly resets navigation chrome.
+21. Copy `CHECKLIST.md` from this repo into the new app's `CLAUDE.md`.
 
 See [`CHECKLIST.md`](CHECKLIST.md) for the compact, copy-pasteable version of
 this list, and [`docs/incidents.md`](docs/incidents.md) for the full postmortems

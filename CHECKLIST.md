@@ -177,6 +177,25 @@ jospabloh/acacia-app-standard. Status:
       changes + collapsible history), the version line in sync with
       package.json, and a contact + ACACIA acknowledgment card.
 
+- [ ] Module 22 — Server-authoritative diffing: any backend function that
+      compares a server-authoritative custom field (tenant_id,
+      write_access, billing_status, …) against a target value to decide
+      whether to write it does a FRESH read via `asServiceRole` first and
+      diffs against THAT — never against `auth.me()`'s own `user.data`/
+      `user.role`, which is cached/session-scoped and can disagree with what
+      is actually persisted. Rumbo's `switchTenant` returned `ok: true`
+      while silently skipping the write for days on exactly this mistake.
+      A partial `data:{...}` patch spreads the full fresh-read object
+      underneath it, never just the changed keys.
+
+- [ ] Module 23 — Nav survives reload: the left sidebar/nav's active item is
+      derived from the current route on every render, not from mount-time
+      state, so the highlight is correct on the very first frame after a
+      full-page reload (Module 18's switch/join flow deliberately triggers
+      one). Any manually-set nav UI state that isn't route-derived (an
+      expanded group, a scroll position) persists across a reload via
+      `sessionStorage`, restored synchronously on mount.
+
 Last audited against the standard: <date> — <what changed / what's still open>
 Last multi-tenant isolation audit: <date> — <scope, findings, what's unverified>
 Secrets last read back: <date> — <which ones, and how each was proven>

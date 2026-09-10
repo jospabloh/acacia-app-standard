@@ -133,28 +133,34 @@ jospabloh/acacia-app-standard. Status:
       Sincronizar ahora and confirm an `app_health` row with `status: ok` and a
       `control:run-sync` audit row for this app.
 
-- [ ] Module 18 — Multi-tenant account switching AND joining, on a first-class
-      `Membership` entity (CtrlHQ's shape — one row per `(tenant_id, user_id,
-      role)`, `read` keyed on `{{user.id}}`), not an embedded
-      `owner_email`/`members[]` array: the resolver computes the FULL set of
-      a caller's tenants, not just the first, and returns it alongside
-      whatever is already persisted — a persisted, still-valid tenant_id keeps
-      winning, an unambiguous single candidate still auto-assigns, and only
-      true ambiguity (no persisted tenant_id, 2+ candidates) blocks on a
-      choice instead of guessing. Joining a tenant by invite code ALWAYS
-      succeeds regardless of how many other tenants the caller already
-      belongs to — the only refusal is already-a-member-of-*this*-tenant,
-      never "you belong to a different one, leave it first" — and a
-      successful join immediately moves the caller into the newly joined
-      tenant. The join/create screen is reachable from inside the app (an
-      account-menu/sidebar "crear o unirme a otro" entry), not gated
-      exclusively on "no tenant yet". A dedicated switch endpoint re-derives
-      the caller's candidate set from scratch server-side (never trusts the
-      requested tenant_id) and answers a tenant the caller doesn't belong to
-      with the exact same refusal as a nonexistent one. The switcher control
-      is visible only when there is more than one candidate, and a successful
-      switch or join hard-reloads rather than resetting tenant-scoped state in
-      place.
+- [x] Module 18 — RETIRED 2026-09-10. **One account, one tenant** — this
+      module used to require the opposite (a `Membership` entity, a tenant
+      switcher, a join flow that never refused a second tenant); it was built
+      across eight apps, never reached production, and was removed from all
+      eight. Do not rebuild it. The user record's tenant field IS the
+      membership: one value, `rls.write`-locked to the service tier, what
+      every entity's RLS compares against, with no second row recording the
+      same fact and no in-app way to move. What the retirement obliges:
+      creating a tenant or redeeming an invite code answers 409 to a caller
+      who already has one (the platform owner excepted; redeeming the code of
+      the tenant you are already in stays idempotent) — check BEFORE creating,
+      or you leave an orphaned tenant with a live invite code and nobody
+      inside; clearing the tenant field IS revocation, so any mirror-sync
+      helper goes with the entity; removing a member is the tenant admin's
+      action (Module 7's member-scoped "delete my account" is unaffected, but
+      a bare "leave this tenant" control now just strands the account on
+      onboarding — there is nowhere else to go). The one piece that survives: where the app legitimately
+      holds more than one profile row per caller (LIUMA's `UserProfile`,
+      FlowFin's `FamilyMembership`), the rule that picks the current one is a
+      single, DETERMINISTICALLY ORDERED function every reader calls — reads
+      and writes disagreeing about which tenant is current is a real, silent
+      bug both of those apps shipped. Note FlowFin's `FamilyMembership` is NOT
+      the retired feature: it predates it and is the authoritative record the
+      app runs on. Before deleting a membership-shaped entity, establish which
+      it is — a mirror of a field the user already has (delete), or the record
+      itself (keep). Deleting it from the deployed schema is manual and
+      order-sensitive: Base44 refuses to drop an entity that still has rows,
+      and `entities push` is all-or-nothing, so delete the rows first.
 
 - [ ] Module 19 — Lock survives debugging: every security-relevant RLS/field
       lock this app has (Module 1's `billing_status`, Module 14's tenant-pointer
@@ -191,8 +197,9 @@ jospabloh/acacia-app-standard. Status:
 - [ ] Module 23 — Nav survives reload: the left sidebar/nav's active item is
       derived from the current route on every render, not from mount-time
       state, so the highlight is correct on the very first frame after a
-      full-page reload (Module 18's switch/join flow deliberately triggers
-      one). Any manually-set nav UI state that isn't route-derived (an
+      full-page reload (a session refresh, a license refetch, a forced
+      logout or plain F5 all trigger one). Any manually-set nav UI state
+      that isn't route-derived (an
       expanded group, a scroll position) persists across a reload via
       `sessionStorage`, restored synchronously on mount.
 

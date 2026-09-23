@@ -443,6 +443,18 @@ company. Concretely, "pro" means:
   password)` directly (plus `base44.auth.loginWithProvider('google', ...)`
   for OAuth) — the credential entry itself happens on this app's own route,
   under this app's own layout, never a redirect away from it.
+- **A split-screen shell, not a single centered card.** Form on the left
+  (logo lockup, the icon/title/subtitle/children/footer stack, a short
+  tagline pinned at the bottom), a branded panel on the right with an
+  eyebrow badge, a headline and one line of supporting copy — hidden below
+  `lg`, not squeezed into the mobile layout. Copy
+  [`shared/auth/AuthLayout.example.jsx`](shared/auth/) in rather than
+  building this from prose alone: FlowFin and StockFlow converged on this
+  shape independently before it was written down here, and ArtisKids shipped
+  without it (a plain centered card, `--primary` still shadcn's near-black
+  scaffold default) and only got caught when someone compared it against its
+  siblings — see `shared/auth/README.md` for the `--primary` gotcha that
+  caused that specifically.
 - Same visual language as the rest of the app (design tokens, not one-off
   colors) and as `acaciaco-site`'s own branding — a user clicking through from
   the marketing site should not land somewhere that looks like a different
@@ -466,7 +478,7 @@ company. Concretely, "pro" means:
   button offered must correspond to a provider actually configured for that
   Base44 app; one that isn't gets removed from the UI, not left for a user
   to discover is dead.
-- Dark-theme correct by default, like every other screen (Module 9's
+- Dark-theme correct by default, like every other screen (Module 12's
   dark-theme rule applies here too — a login page is the worst place for a
   washed-out unstyled color to show up first).
 
@@ -1440,7 +1452,9 @@ Each module's proof is a thing you can run and read.
    Mission Control side (Module 17): the `apps` row, the adapter,
    `licenseControl.js`, `ticketControl.js`, `messaging.js` and the client
    catalogue mirror. Registration alone wires the config, not the data path.
-10. Build the login page to the Module 10 bar.
+10. Copy the auth layout in from [`shared/auth/`](shared/auth/) (Module 10)
+    before writing `Login.jsx` itself — check `--primary` is the app's real
+    brand color, not shadcn's scaffold default, first.
 11. Copy the theme switcher in from [`shared/theme/`](shared/theme/) (Module 12)
     and delete any other theme control.
 12. Copy the smoke suite in from [`shared/smoke/`](shared/smoke/) (Module 13)

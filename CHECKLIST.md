@@ -64,9 +64,12 @@ jospabloh/acacia-app-standard. Status:
       08:00 UTC sync is the backstop; on its own it costs the customer a day.
 - [ ] Module 9 — acaciaco-site: this app has a page under apps/ (or freeware/),
       using styles/base.css tokens, dark-theme correct.
-- [ ] Module 10 — Login page: a real in-app screen (own email/password
-      fields calling loginViaEmailPassword/loginWithProvider directly) —
-      NEVER a redirect to Base44's default hosted login. On-brand, real
+- [ ] Module 10 — Login page: split-screen shell copied in from
+      `shared/auth/` (form + branded panel, not a single centered card —
+      check `--primary` is the app's real brand color first, not shadcn's
+      scaffold default), own email/password fields calling
+      loginViaEmailPassword/loginWithProvider directly — NEVER a redirect
+      to Base44's default hosted login. On-brand, real
       error/suspended/view_only states, links to trial and support,
       dark-theme correct. Every social button shown corresponds to a
       provider actually enabled on the Base44 app — an unconfigured one

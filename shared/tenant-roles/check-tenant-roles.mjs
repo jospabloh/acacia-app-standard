@@ -10,7 +10,11 @@
 //   2. an object holding `user_condition` next to sibling keys — Base44 drops
 //      the siblings silently, so the condition ends up unscoped;
 //   3. backend code that writes built-in role "admin" to a user outside the
-//      platform-owner files listed in --allow.
+//      platform-owner files listed in --allow;
+//   4. a User field that any RLS rule reads as {{user.data.<field>}} (the
+//      tenant pointer, a data role) without a platform-only rls.write lock on
+//      User — otherwise a user re-points themselves to another tenant with
+//      updateMe, and every rule keyed on that field follows them there.
 // It reads the repo's schema files, not the deployed schema: pair it with the
 // Module 4 rule of verifying what is deployed.
 //
@@ -84,6 +88,40 @@ export function checkEntity(name, schema) {
   return findings
 }
 
+// Every {{user.data.<field>}} a rule depends on must be locked on User.
+export function userDataFieldsUsed(schema) {
+  const out = new Set()
+  const re = /\{\{\s*user\.data\.([A-Za-z0-9_]+)\s*\}\}/g
+  const scan = (v) => {
+    if (typeof v === 'string') { for (const m of v.matchAll(re)) out.add(m[1]) }
+    else if (Array.isArray(v)) v.forEach(scan)
+    else if (v && typeof v === 'object') for (const [k, x] of Object.entries(v)) {
+      scan(x)
+    }
+  }
+  const walkUserCond = (v) => {
+    if (Array.isArray(v)) return v.forEach(walkUserCond)
+    if (!v || typeof v !== 'object') return
+    if (v.user_condition && typeof v.user_condition === 'object') {
+      for (const k of Object.keys(v.user_condition)) { const km = /^data\.([A-Za-z0-9_]+)$/.exec(k); if (km) out.add(km[1]) }
+    }
+    Object.values(v).forEach(walkUserCond)
+  }
+  scan(schema?.rls); walkUserCond(schema?.rls)
+  for (const def of Object.values(schema?.properties ?? {})) { scan(def?.rls); walkUserCond(def?.rls) }
+  return out
+}
+
+export function unlockedUserFields(fieldsUsed, userSchema) {
+  const missing = []
+  for (const f of fieldsUsed) {
+    const w = userSchema?.properties?.[f]?.rls?.write
+    const locked = w && isPlatformCondition(w.user_condition) && Object.keys(w).length === 1
+    if (!locked) missing.push(f)
+  }
+  return missing.sort()
+}
+
 const ASSIGN_ADMIN = /\brole\s*:\s*['"]admin['"]/
 
 export function findAdminAssignments(source) {
@@ -112,14 +150,21 @@ function main() {
 
   const entDir = [join(root, 'base44/entities'), join(root, 'entities')].find(existsSync)
   if (!entDir) { console.error('✗ no base44/entities directory found'); process.exit(1) }
+  const fieldsUsed = new Set()
+  let userSchema = null
   for (const file of walk(entDir, ['.jsonc', '.json'])) {
     let schema
     try { schema = JSON.parse(stripJsonc(readFileSync(file, 'utf8'))) } catch (e) {
       problems.push(`${relative(root, file)}: cannot parse (${e.message})`); continue
     }
+    if ((schema.name ?? '') === 'User' || /\/User\.jsonc?$/.test(file)) userSchema = schema
     for (const f of checkEntity(schema.name ?? file, schema)) {
       problems.push(`${relative(root, file)} ${f.path}: ${f.kind} — ${f.detail}`)
     }
+    for (const f of userDataFieldsUsed(schema)) fieldsUsed.add(f)
+  }
+  for (const f of unlockedUserFields(fieldsUsed, userSchema)) {
+    problems.push(`User.${f}: RLS reads {{user.data.${f}}} but User has no platform-only rls.write lock on it${userSchema ? '' : ' (no User schema file at all)'}`)
   }
   for (const file of walk(join(root, 'base44/functions'), ['.ts', '.js'])) {
     const rel = relative(root, file)

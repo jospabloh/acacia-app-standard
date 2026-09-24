@@ -54,3 +54,26 @@ test('jsonc comments and trailing commas parse', () => {
   const s = stripJsonc('{ // c\n "a": "http://x", /* b */ "b": [1,2,], }')
   assert.deepEqual(JSON.parse(s), { a: 'http://x', b: [1, 2] })
 })
+
+import { userDataFieldsUsed, unlockedUserFields } from './check-tenant-roles.mjs'
+
+test('a tenant pointer read by RLS must be locked on User, or users re-point themselves', () => {
+  const patient = { rls: { read: { 'data.tenant_id': '{{user.data.tenant_id}}' } } }
+  const used = userDataFieldsUsed(patient)
+  assert.deepEqual([...used], ['tenant_id'])
+  assert.deepEqual(unlockedUserFields(used, { properties: { tenant_id: { type: 'string' } } }), ['tenant_id'])
+  assert.deepEqual(unlockedUserFields(used, null), ['tenant_id'], 'no User schema at all is also unlocked')
+  const locked = { properties: { tenant_id: { rls: { write: { user_condition: { role: 'admin' } } } } } }
+  assert.deepEqual(unlockedUserFields(used, locked), [])
+})
+
+test('a data role tested in user_condition counts as a field RLS depends on', () => {
+  const sub = { rls: { read: { $and: [{ user_condition: { 'data.app_role': 'ADMIN' } }, { 'data.school_id': '{{user.data.school_id}}' }] } } }
+  assert.deepEqual([...userDataFieldsUsed(sub)].sort(), ['app_role', 'school_id'])
+})
+
+test('a lock that a tenant role can satisfy is not a lock', () => {
+  const used = new Set(['business_id'])
+  const weak = { properties: { business_id: { rls: { write: { user_condition: { role: 'owner' } } } } } }
+  assert.deepEqual(unlockedUserFields(used, weak), ['business_id'])
+})

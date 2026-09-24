@@ -1449,8 +1449,9 @@ by construction — as long as that data field is never tested unscoped.
    [`shared/tenant-roles/check-tenant-roles.mjs`](shared/tenant-roles/check-tenant-roles.mjs)
    from the app root, with `--allow` listing only the platform-owner recovery
    functions. It fails on any unscoped tenant role in an entity rule or a
-   field lock, on `user_condition` with sibling keys, and on any function
-   that writes `role: 'admin'`.
+   field lock, on `user_condition` with sibling keys, on any function
+   that writes `role: 'admin'`, and on any `{{user.data.<field>}}` a rule
+   depends on that `User` does not lock to the platform tier.
 3. **Is the repo what's deployed?** The checker reads schema files. Confirm
    the deployed schema matches (Module 4); if it can't be read, say so in the
    Module 14 audit rather than assume.
@@ -1476,6 +1477,28 @@ functions and schema separately:
 4. Re-read `User` roles, and re-run step 1 of the check.
 5. Wire the checker into CI (`npm run validate:tenant-roles`) so the next
    signup flow or schema edit can't reintroduce it.
+
+**Portfolio status, 2026-09-24** — live `User` roles read from each app, and
+`check-tenant-roles.mjs` run over each app's **workspace** entity files (the
+code Base44 publishes; the deployed schema could not be read that day, so
+re-run against it before calling any row closed). Built-in `admin` is held
+only by the platform owner's accounts in all 14 apps.
+
+| app | customers today | result |
+|---|---|---|
+| StockFlow | yes | clean (fixed and verified live the same day) |
+| ArtisKids, RADAR, CateqHub, KitchOps, CtrlHQ | some | clean |
+| Rumbo | yes | `DebugProbe` rules are a bare `owner` on all four ops; `TenantLicense.create`/`User.create` and field locks on `Driver`/`User.owner_group_id` allow unscoped `owner`/`dispatcher` |
+| LIUMA | yes | no `User.jsonc` at all, so `school_id`/`app_role` — which `SchoolSubscription.read` depends on — are unlocked |
+| Puntos+ | no | 14 `LoyaltyAccount` field locks accept unscoped `merchant`/`business_admin` |
+| FlowFin | yes | `AppChangelog`/`AppVersion` read by `role:"user"` — global release notes, harmless |
+| MedControl MX | no | `User.tenant_id`/`patient_id` unlocked — every clinical entity scopes on them |
+| FamiliasConectadas | no | `User.family_id` unlocked — every family entity (incl. live location) scopes on it |
+| Sommel | no | `User.tenant_id` unlocked — every bar entity scopes on it |
+| AudioVisual Order Pro | no | no entity files in the workspace — nothing to check yet |
+
+The last three have no customer yet, which is the only reason they are not
+live: they must be fixed before their first signup, not after.
 
 ---
 

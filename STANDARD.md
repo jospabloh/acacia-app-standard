@@ -1423,7 +1423,8 @@ inside an `$and` that also pins the record to the caller's tenant. Any other
 role (`owner`, `business_admin`, `staff`, a `data.*_role` field…) standing
 alone in an `$or` matches that role in **every** tenant. And built-in `admin`
 is held only by the platform owner accounts: no signup, invite, role change
-or migration may write it to anyone else.
+or migration may write it to anyone else — **except in design B below**, where
+it is a tenant role on purpose and must then be scoped like any other.
 
 Two designs satisfy it — pick one per app and don't mix them:
 
@@ -1435,7 +1436,10 @@ Two designs satisfy it — pick one per app and don't mix them:
 - **B — the tenant role lives inside the tenant `$and`.** Rumbo works this
   way: its rules read `$and[ tenant_id match, $or[owner, admin, …] ]`, so its
   roles only ever match rows of the caller's own tenant, and its pure service
-  entities use the `__service_role_only__` sentinel.
+  entities use the `__service_role_only__` sentinel. Here built-in `admin` is a
+  tenant role too (`manageRole` hands it out), so a bare `admin` branch is as
+  wrong as a bare `owner` one, and only the sentinel is the platform tier. Run
+  the checker with `--tenant-admin`.
 
 Apps that keep the tenant role in a separate data field (`app_role`,
 `parish_role`, `family_role`) and leave built-in `role` at `user` are design A
@@ -1448,7 +1452,9 @@ by construction — as long as that data field is never tested unscoped.
 2. **What does the code hand out?** Run
    [`shared/tenant-roles/check-tenant-roles.mjs`](shared/tenant-roles/check-tenant-roles.mjs)
    from the app root, with `--allow` listing only the platform-owner recovery
-   functions. It fails on any unscoped tenant role in an entity rule or a
+   functions (design B: `--tenant-admin`; a `User` field a tenant admin
+   assigns to their own members, like Rumbo's `owner_group_id`, goes in
+   `--delegated` and may be locked to a tenant-scoped role). It fails on any unscoped tenant role in an entity rule or a
    field lock, on `user_condition` with sibling keys, on any function
    that writes `role: 'admin'`, and on any `{{user.data.<field>}}` a rule
    depends on that `User` does not lock to the platform tier.
@@ -1488,8 +1494,8 @@ only by the platform owner's accounts in all 14 apps.
 |---|---|---|
 | StockFlow | yes | clean (fixed and verified live the same day) |
 | ArtisKids, RADAR, CateqHub, KitchOps, CtrlHQ | some | clean |
-| Rumbo | yes | `DebugProbe` rules are a bare `owner` on all four ops; `TenantLicense.create`/`User.create` and field locks on `Driver`/`User.owner_group_id` allow unscoped `owner`/`dispatcher` |
-| LIUMA | yes | no `User.jsonc` at all, so `school_id`/`app_role` — which `SchoolSubscription.read` depends on — are unlocked |
+| Rumbo | yes | fix in jospabloh/rumbo#129: `DebugProbe` (bare `owner`, readable by every tenant's owner) and `TenantLicense.create`/`User.create` → sentinel; `Driver`/`User.owner_group_id` field locks tenant-scoped. Pending `deploy:entities` |
+| LIUMA | yes | fix in jospabloh/liuma#181: `User.school_id`/`app_role` locked `write:false`. Not live — no `User` holds them. Pending `deploy:entities` |
 | Puntos+ | no | 14 `LoyaltyAccount` field locks accept unscoped `merchant`/`business_admin` |
 | FlowFin | yes | `AppChangelog`/`AppVersion` read by `role:"user"` — global release notes, harmless |
 | MedControl MX | no | `User.tenant_id`/`patient_id` unlocked — every clinical entity scopes on them |

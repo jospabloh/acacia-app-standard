@@ -19,10 +19,20 @@
 // Module 4 rule of verifying what is deployed.
 //
 //   node scripts/check-tenant-roles.mjs [--root .] [--allow path1,path2]
+//        [--tenant-admin] [--delegated field1,field2]
+//
+// --tenant-admin  design B (Module 24): the app's tenant admins hold built-in
+//                 "admin", so "admin" is a TENANT role and must be scoped like
+//                 any other. Only "__service_role_only__" counts as platform.
+// --delegated     User fields a tenant admin assigns to members of their own
+//                 tenant (e.g. an investor's group). Their lock may be a tenant
+//                 role, as long as it is scoped to the tenant. Tenant pointers
+//                 (tenant_id, business_id…) never belong here.
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs'
 import { join, relative } from 'node:path'
 
-const PLATFORM_ROLES = new Set(['admin', '__service_role_only__'])
+export const PLATFORM_ROLES = new Set(['admin', '__service_role_only__'])
+export const SERVICE_ONLY = new Set(['__service_role_only__'])
 const TENANT_TEMPLATE = /^\{\{\s*user\.(id|email|data\.[A-Za-z0-9_]+)\s*\}\}$/
 
 export function stripJsonc(text) {
@@ -51,38 +61,38 @@ function isTenantMatch(node) {
     k !== 'user_condition' && !k.startsWith('$') && typeof v === 'string' && TENANT_TEMPLATE.test(v))
 }
 
-function isPlatformCondition(cond) {
+function isPlatformCondition(cond, platform = PLATFORM_ROLES) {
   const keys = Object.keys(cond ?? {})
-  return keys.length === 1 && keys[0] === 'role' && PLATFORM_ROLES.has(cond.role)
+  return keys.length === 1 && keys[0] === 'role' && platform.has(cond.role)
 }
 
 // Walk one rule; `scoped` is true once an enclosing $and carries a tenant match.
-export function findUnscoped(rule, path = '', scoped = false, out = []) {
+export function findUnscoped(rule, path = '', scoped = false, out = [], platform = PLATFORM_ROLES) {
   if (!rule || typeof rule !== 'object') return out
-  if (Array.isArray(rule)) { rule.forEach((r, i) => findUnscoped(r, `${path}[${i}]`, scoped, out)); return out }
+  if (Array.isArray(rule)) { rule.forEach((r, i) => findUnscoped(r, `${path}[${i}]`, scoped, out, platform)); return out }
   if ('user_condition' in rule) {
     const siblings = Object.keys(rule).filter((k) => k !== 'user_condition')
     if (siblings.length) out.push({ path, kind: 'sibling-keys', detail: `user_condition beside ${siblings.join(', ')} (siblings are dropped)` })
-    if (!scoped && !isPlatformCondition(rule.user_condition)) {
+    if (!scoped && !isPlatformCondition(rule.user_condition, platform)) {
       out.push({ path, kind: 'unscoped-tenant-role', detail: JSON.stringify(rule.user_condition) })
     }
   }
   if (Array.isArray(rule.$and)) {
     const tenantScoped = scoped || rule.$and.some(isTenantMatch)
-    rule.$and.forEach((r, i) => findUnscoped(r, `${path}.$and[${i}]`, tenantScoped, out))
+    rule.$and.forEach((r, i) => findUnscoped(r, `${path}.$and[${i}]`, tenantScoped, out, platform))
   }
-  if (Array.isArray(rule.$or)) rule.$or.forEach((r, i) => findUnscoped(r, `${path}.$or[${i}]`, scoped, out))
+  if (Array.isArray(rule.$or)) rule.$or.forEach((r, i) => findUnscoped(r, `${path}.$or[${i}]`, scoped, out, platform))
   return out
 }
 
-export function checkEntity(name, schema) {
+export function checkEntity(name, schema, platform = PLATFORM_ROLES) {
   const findings = []
   for (const [op, rule] of Object.entries(schema?.rls ?? {})) {
-    for (const f of findUnscoped(rule, `rls.${op}`)) findings.push({ entity: name, ...f })
+    for (const f of findUnscoped(rule, `rls.${op}`, false, [], platform)) findings.push({ entity: name, ...f })
   }
   for (const [field, def] of Object.entries(schema?.properties ?? {})) {
     for (const [op, rule] of Object.entries(def?.rls ?? {})) {
-      for (const f of findUnscoped(rule, `properties.${field}.rls.${op}`)) findings.push({ entity: name, ...f })
+      for (const f of findUnscoped(rule, `properties.${field}.rls.${op}`, false, [], platform)) findings.push({ entity: name, ...f })
     }
   }
   return findings
@@ -112,11 +122,25 @@ export function userDataFieldsUsed(schema) {
   return out
 }
 
-export function unlockedUserFields(fieldsUsed, userSchema) {
+// A User field is locked when nobody but the platform can write it: `false`
+// (the strongest lock — not even the service role's client-side callers), or a
+// lone platform `user_condition`. A --delegated field may instead be locked to a
+// tenant role, provided every condition in that lock is scoped to the tenant.
+function hasCondition(rule) {
+  if (!rule || typeof rule !== 'object') return false
+  if (Array.isArray(rule)) return rule.some(hasCondition)
+  return 'user_condition' in rule || Object.values(rule).some(hasCondition)
+}
+
+export function unlockedUserFields(fieldsUsed, userSchema, { platform = PLATFORM_ROLES, delegated = new Set() } = {}) {
   const missing = []
   for (const f of fieldsUsed) {
     const w = userSchema?.properties?.[f]?.rls?.write
-    const locked = w && isPlatformCondition(w.user_condition) && Object.keys(w).length === 1
+    let locked = w === false ||
+      (!!w && typeof w === 'object' && isPlatformCondition(w.user_condition, platform) && Object.keys(w).length === 1)
+    if (!locked && delegated.has(f) && w && typeof w === 'object') {
+      locked = hasCondition(w) && findUnscoped(w, '', false, [], platform).length === 0
+    }
     if (!locked) missing.push(f)
   }
   return missing.sort()
@@ -146,6 +170,9 @@ function main() {
   const opt = (name) => { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : undefined }
   const root = opt('--root') ?? '.'
   const allow = new Set((opt('--allow') ?? '').split(',').filter(Boolean))
+  const tenantAdmin = args.includes('--tenant-admin')
+  const platform = tenantAdmin ? SERVICE_ONLY : PLATFORM_ROLES
+  const delegated = new Set((opt('--delegated') ?? '').split(',').filter(Boolean))
   const problems = []
 
   const entDir = [join(root, 'base44/entities'), join(root, 'entities')].find(existsSync)
@@ -158,15 +185,17 @@ function main() {
       problems.push(`${relative(root, file)}: cannot parse (${e.message})`); continue
     }
     if ((schema.name ?? '') === 'User' || /\/User\.jsonc?$/.test(file)) userSchema = schema
-    for (const f of checkEntity(schema.name ?? file, schema)) {
+    for (const f of checkEntity(schema.name ?? file, schema, platform)) {
       problems.push(`${relative(root, file)} ${f.path}: ${f.kind} — ${f.detail}`)
     }
     for (const f of userDataFieldsUsed(schema)) fieldsUsed.add(f)
   }
-  for (const f of unlockedUserFields(fieldsUsed, userSchema)) {
+  for (const f of unlockedUserFields(fieldsUsed, userSchema, { platform, delegated })) {
     problems.push(`User.${f}: RLS reads {{user.data.${f}}} but User has no platform-only rls.write lock on it${userSchema ? '' : ' (no User schema file at all)'}`)
   }
-  for (const file of walk(join(root, 'base44/functions'), ['.ts', '.js'])) {
+  // Design B hands out built-in "admin" to tenant admins on purpose; its rules
+  // (checked above with admin as a tenant role) are what keep that safe.
+  for (const file of tenantAdmin ? [] : walk(join(root, 'base44/functions'), ['.ts', '.js'])) {
     const rel = relative(root, file)
     if (allow.has(rel) || /\.test\.(ts|js)$/.test(rel)) continue
     for (const h of findAdminAssignments(readFileSync(file, 'utf8'))) {

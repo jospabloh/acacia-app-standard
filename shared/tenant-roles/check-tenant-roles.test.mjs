@@ -77,3 +77,29 @@ test('a lock that a tenant role can satisfy is not a lock', () => {
   const weak = { properties: { business_id: { rls: { write: { user_condition: { role: 'owner' } } } } } }
   assert.deepEqual(unlockedUserFields(used, weak), ['business_id'])
 })
+
+import { SERVICE_ONLY } from './check-tenant-roles.mjs'
+
+test('write:false is the strongest lock — Rumbo locks tenant_id this way and must pass', () => {
+  const user = { properties: { tenant_id: { rls: { write: false } } } }
+  assert.deepEqual(unlockedUserFields(new Set(['tenant_id']), user), [])
+})
+
+test('design B: a bare built-in admin is a tenant role there, so it is caught', () => {
+  // Rumbo's tenant admins hold built-in "admin"; a bare branch would match every tenant's admin.
+  const rule = { $or: [{ user_condition: { role: 'admin' } }] }
+  assert.equal(findUnscoped(rule).length, 0, 'design A: admin is the platform tier')
+  assert.equal(findUnscoped(rule, '', false, [], SERVICE_ONLY).length, 1, 'design B: admin is a tenant role')
+  const scoped = { $and: [{ 'data.tenant_id': '{{user.data.tenant_id}}' }, rule] }
+  assert.equal(findUnscoped(scoped, '', false, [], SERVICE_ONLY).length, 0)
+})
+
+test('a delegated field may be locked to a tenant role, but only scoped to the tenant', () => {
+  const scopedLock = { $and: [{ 'data.tenant_id': '{{user.data.tenant_id}}' }, { $or: [{ user_condition: { role: 'owner' } }] }] }
+  const bareLock = { $or: [{ user_condition: { role: 'owner' } }] }
+  const opts = { platform: SERVICE_ONLY, delegated: new Set(['owner_group_id']) }
+  assert.deepEqual(unlockedUserFields(new Set(['owner_group_id']), { properties: { owner_group_id: { rls: { write: scopedLock } } } }, opts), [])
+  assert.deepEqual(unlockedUserFields(new Set(['owner_group_id']), { properties: { owner_group_id: { rls: { write: bareLock } } } }, opts), ['owner_group_id'])
+  // Not delegated: a tenant-scoped role lock still fails — tenant pointers need the platform tier.
+  assert.deepEqual(unlockedUserFields(new Set(['tenant_id']), { properties: { tenant_id: { rls: { write: scopedLock } } } }, opts), ['tenant_id'])
+})

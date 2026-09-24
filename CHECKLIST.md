@@ -210,4 +210,9 @@ Last audited against the standard: <date> — <what changed / what's still open>
 Last multi-tenant isolation audit: <date> — <scope, findings, what's unverified>
 Secrets last read back: <date> — <which ones, and how each was proven>
 Security locks last checked for drift (Module 19): <date> — <deployed vs. repo, any found open>
+- [ ] Module 24 — Tenant roles: built-in `admin` held only by platform
+      accounts (read `User` live); every non-platform `user_condition` sits
+      inside an `$and` with the tenant match; signup/role-change code never
+      writes `role: 'admin'`; `check-tenant-roles.mjs` from
+      `shared/tenant-roles/` runs in CI; signup pings MC's `tenant-pull`.
 ```

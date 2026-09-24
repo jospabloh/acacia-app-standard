@@ -5,6 +5,34 @@ Postmortems from across the portfolio that turned into a rule in
 standard stays a contract, not a story — but the story is why each rule exists,
 so read the relevant one before arguing a rule doesn't apply to your case.
 
+## StockFlow — a tenant's admin held the platform's role (2026-09-24)
+
+A new customer signed up and nothing told the platform owner; looking into
+why led to a bigger finding. StockFlow's `createBusinessSafe` gave every new
+business admin Base44's built-in `role: "admin"`, and every entity's RLS
+carried Module 4's `{"user_condition":{"role":"admin"}}` service branch,
+which is not tied to a tenant. The combination let any business admin —
+including anyone who self-signed up — reach other businesses' records
+outside the app's UI. The app itself never showed it, because every screen
+filters by the caller's business.
+
+Confirmed live with a throwaway account rather than inferred, then fixed the
+same day: business admins became `owner`, tenant-level checks accept both
+values, platform-only checks kept `admin`, and a platform-owner-only
+migration moved the two real customers. The same throwaway account, as
+`owner`, then read zero rows from other businesses. A lint step now fails if
+any function writes `role: 'admin'`.
+
+Two lessons went into the standard. **Module 24**: a tenant's role must be
+ANDed with the tenant match, and built-in `admin` belongs to the platform
+alone — with a shared checker any app can run in CI. **Gates table, row
+11**: the Base44 CLI reported every grouped function `unchanged` after a real
+change, and production kept the old code until the app was published from
+the panel; a deploy is proven by calling code only the new version has.
+
+A portfolio sweep the same day read every app's live `User` roles: outside
+StockFlow, built-in `admin` is held only by the platform owner's accounts.
+
 ## Rumbo — an unconfigured login provider locked a new user out entirely (2026-08-26)
 
 Feedback from two prospective users trying to join a live tenant ("Car-Go

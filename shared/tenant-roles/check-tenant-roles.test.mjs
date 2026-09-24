@@ -103,3 +103,26 @@ test('a delegated field may be locked to a tenant role, but only scoped to the t
   // Not delegated: a tenant-scoped role lock still fails — tenant pointers need the platform tier.
   assert.deepEqual(unlockedUserFields(new Set(['tenant_id']), { properties: { tenant_id: { rls: { write: scopedLock } } } }, opts), ['tenant_id'])
 })
+
+import { setTenantKeys, DEFAULT_TENANT_KEYS } from './check-tenant-roles.mjs'
+
+test('only a tenant key scopes a rule: a shared value like status matches every tenant', () => {
+  const role = { user_condition: { role: 'owner' } }
+  const byStatus = { $and: [{ 'data.status': '{{user.data.status}}' }, role] }
+  const byTenant = { $and: [{ 'data.tenant_id': '{{user.data.tenant_id}}' }, role] }
+  const bySelf = { $and: [{ created_by_id: '{{user.id}}' }, role] }
+  assert.equal(findUnscoped(byStatus).length, 1)
+  assert.equal(findUnscoped(byTenant).length, 0)
+  assert.equal(findUnscoped(bySelf).length, 0)
+  // An app whose tenant key isn't in the defaults declares it.
+  const byClinic = { $and: [{ 'data.clinic_id': '{{user.data.clinic_id}}' }, role] }
+  assert.equal(findUnscoped(byClinic).length, 1)
+  setTenantKeys([...DEFAULT_TENANT_KEYS, 'clinic_id'])
+  assert.equal(findUnscoped(byClinic).length, 0)
+  setTenantKeys(DEFAULT_TENANT_KEYS)
+})
+
+test('a positional grant of built-in admin is caught, not just role: "admin"', () => {
+  assert.equal(findAdminAssignments("await base44.users.inviteUser(email, 'admin')").length, 1)
+  assert.equal(findAdminAssignments("await base44.users.inviteUser(email, 'user')").length, 0)
+})

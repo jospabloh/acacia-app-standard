@@ -106,11 +106,15 @@ moment the tenant is created — same shape as Module 8's `ticket-pull`
 failure never blocks onboarding) — so Mission Control can write an `alerts`
 row (`kind: 'new_tenant'`, the same `alerts` table `ingestTicket.js` already
 writes `kind: 'support_ticket'` rows to) and push a notification to the
-platform owner. **Neither side of this exists yet**: no app has the call
-site, Mission Control has no `/api/ingest/tenant-created`-equivalent
-endpoint, and — this is the more surprising gap — **nothing in Mission
-Control's own UI reads the `alerts` table at all**, including the
-`support_ticket` rows it already writes. Building the ingest endpoint
+platform owner. **Built 2026-09-24:** Mission Control's `/api/ingest/tenant-pull`
+(`{app, tenantId}`; MC re-reads the tenant through the bridge, so a forged
+ping can't invent one) and, as a net for apps without the ping, the daily
+licence sync announces any tenant new to the bodega. Both write one
+`alerts` row (`kind: 'new_tenant'`) and email `SUPPORT_ALERT_EMAILS`.
+StockFlow sends the ping from its signup; **every other app still has to
+add the call site** — until then it is covered by the sync, within a day.
+Still open: **nothing in Mission Control's own UI reads the `alerts` table
+at all**, including the `support_ticket` rows it already writes. Building the ingest endpoint
 without also surfacing `alerts` somewhere an operator actually looks (a
 Dashboard widget, at minimum) would make the write real but the alert
 invisible; both halves are the module, same as Module 8's "write it, then
@@ -1401,6 +1405,80 @@ nothing about where the user actually is in the app changed.
 
 ---
 
+## 24. A tenant's role never reaches every tenant — built-in `admin` is the platform's
+
+**Why this module exists.** On 2026-09-24 StockFlow was found storing each
+business's own admin in Base44's built-in `role: "admin"` — the same value
+Module 4's service-tier branch `{"user_condition":{"role":"admin"}}` tests,
+and that branch is deliberately not tied to any tenant. Each choice was
+reasonable alone; together they meant any customer admin, including anyone
+who signed up and created a business, reached every other tenant's rows
+outside the app's UI. It was fixed and verified live the same day
+([`docs/incidents.md`](docs/incidents.md)). Nothing about it was specific to
+StockFlow, so this module makes the rule explicit and checkable.
+
+**The rule.** An RLS `user_condition` either tests the **platform tier** —
+built-in `role: "admin"` or the `__service_role_only__` sentinel — or it sits
+inside an `$and` that also pins the record to the caller's tenant. Any other
+role (`owner`, `business_admin`, `staff`, a `data.*_role` field…) standing
+alone in an `$or` matches that role in **every** tenant. And built-in `admin`
+is held only by the platform owner accounts: no signup, invite, role change
+or migration may write it to anyone else.
+
+Two designs satisfy it — pick one per app and don't mix them:
+
+- **A — the tenant admin gets its own built-in value** (`owner`,
+  `business_admin`…) and the rules keep Module 4's shape. StockFlow
+  (`owner`), Puntos+, CtrlHQ and KitchOps (`business_admin`) work this way.
+  Every "is this the tenant's admin?" check in code accepts that value;
+  platform-only checks keep `admin` alone.
+- **B — the tenant role lives inside the tenant `$and`.** Rumbo works this
+  way: its rules read `$and[ tenant_id match, $or[owner, admin, …] ]`, so its
+  roles only ever match rows of the caller's own tenant, and its pure service
+  entities use the `__service_role_only__` sentinel.
+
+Apps that keep the tenant role in a separate data field (`app_role`,
+`parish_role`, `family_role`) and leave built-in `role` at `user` are design A
+by construction — as long as that data field is never tested unscoped.
+
+**Checking an app** (all read-only):
+
+1. **Who holds built-in `admin`?** Read `User` with `email, role`. Anyone
+   other than the platform owner accounts is a live exposure — stop and fix.
+2. **What does the code hand out?** Run
+   [`shared/tenant-roles/check-tenant-roles.mjs`](shared/tenant-roles/check-tenant-roles.mjs)
+   from the app root, with `--allow` listing only the platform-owner recovery
+   functions. It fails on any unscoped tenant role in an entity rule or a
+   field lock, on `user_condition` with sibling keys, and on any function
+   that writes `role: 'admin'`.
+3. **Is the repo what's deployed?** The checker reads schema files. Confirm
+   the deployed schema matches (Module 4); if it can't be read, say so in the
+   Module 14 audit rather than assume.
+4. **Tenant pointers stay locked.** The `User` fields that name the tenant
+   (`business_id`, `company_id`, `family_id`…) and any role-like data field
+   carry `rls.write` limited to the platform tier, so a user can't re-point
+   or promote themselves (Base44 already refuses self-changes to built-in
+   `role`).
+
+**Fixing an app on design A** — the order matters because Base44 publishes
+functions and schema separately:
+
+1. Add the tenant value to `User.role`'s enum, and make every tenant-admin
+   check accept both the old and new value (one helper, e.g.
+   `isBusinessAdmin`, on the client; the same inline pair on the server).
+   Platform-only checks keep `admin` alone. Signup and role-change code write
+   the new value.
+2. Deploy schema, functions and site — then **Publish** in the Base44 panel
+   and prove the new code is live by calling a new action and reading its
+   own error, not the CLI's `unchanged` (see the gates table).
+3. Move existing tenant admins with a platform-owner-only, dry-run-first
+   migration action that never touches the platform accounts.
+4. Re-read `User` roles, and re-run step 1 of the check.
+5. Wire the checker into CI (`npm run validate:tenant-roles`) so the next
+   signup flow or schema edit can't reintroduce it.
+
+---
+
 ## Verification gates — what actually proves a module is live
 
 The recurring failure across this portfolio is not writing the code. It is
@@ -1416,7 +1494,7 @@ Each module's proof is a thing you can run and read.
 | 4 RLS | both halves of every rule are right | `npm run validate:rls` in CI, then `list_entity_schemas` — the deployed schema, not the file |
 | 5 health | MC can see the app | an `app_health` row with `status: ok` dated today |
 | 8 support | tickets arrive now, not tomorrow | raise one and watch it appear in MC in seconds |
-| 11 deploy | what you merged is what is served | read the served file's content; `unchanged` from the CLI means deployed already matched |
+| 11 deploy | what you merged is what is served | read the served file's content; for functions, call an action that only the new code has and read its own error (`unknown action` = old code). The CLI's `unchanged` is **not** proof — on 2026-09-24 it reported every grouped function unchanged while production kept the old code until **Publish** in the Base44 panel |
 | 12 theme | the switcher is the only theme writer | grep for other writers of the theme attribute; there must be none |
 | 13 smoke | the live site is the one you think | `npm run test:smoke` green in Actions, against production |
 | 14 isolation | no tenant can reach another | the dated audit, naming what could **not** be verified |
@@ -1428,6 +1506,7 @@ Each module's proof is a thing you can run and read.
 | 21 about screen | version/changelog/manual/contact are one screen, in sync | the version shown matches `package.json` and the update banner; the changelog entry for the current version is non-empty |
 | 22 server-authoritative diffing | a write decision never trusts `auth.me()`'s cached view | grep every backend function for `user.data`/`caller.data`/`user.role` used in a comparison that gates a write — none should exist outside a fresh `asServiceRole` read |
 | 23 nav survives reload | the sidebar's active item and any manual expand/scroll state look right on the first frame after a reload | hard-reload on a deep route and confirm the highlight is correct immediately, then expand a group, reload again, confirm it's still expanded |
+| 24 tenant roles | no tenant role reaches every tenant | only platform accounts hold built-in `admin` in live `User`; `check-tenant-roles.mjs` green in CI; deployed schema matches the checked files |
 
 ---
 
@@ -1459,7 +1538,9 @@ Each module's proof is a thing you can run and read.
     and delete any other theme control.
 12. Copy the smoke suite in from [`shared/smoke/`](shared/smoke/) (Module 13)
     and point its config at the app's real URL.
-13. Run the Module 14 isolation audit before the **second** tenant exists —
+13. Decide the tenant-admin role design (Module 24) before the first signup
+    flow exists, and add `check-tenant-roles.mjs` to CI from commit one.
+    Then run the Module 14 isolation audit before the **second** tenant exists —
     with one tenant nothing can leak, which is also why nothing gets caught.
 14. Copy [`shared/bridge/acaciaSign.ts`](shared/bridge/acaciaSign.ts) and its
     test in (Module 15), set `ACACIA_APP_SLUG` to the app's Mission Control id,

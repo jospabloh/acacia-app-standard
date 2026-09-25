@@ -1498,9 +1498,9 @@ only by the platform owner's accounts in all 14 apps.
 | LIUMA | yes | fix in jospabloh/liuma#181: `User.school_id`/`app_role` locked `write:false`. Not live — no `User` holds them. Pending `deploy:entities` |
 | Puntos+ | no | 14 `LoyaltyAccount` field locks accept unscoped `merchant`/`business_admin` |
 | FlowFin | yes | `AppChangelog`/`AppVersion` read by `role:"user"` — global release notes, harmless |
-| MedControl MX | no | `User.tenant_id`/`patient_id` unlocked — every clinical entity scopes on them |
-| FamiliasConectadas | no | `User.family_id` unlocked — every family entity (incl. live location) scopes on it |
-| Sommel | no | `User.tenant_id` unlocked — every bar entity scopes on it |
+| MedControl MX | no | fixed in the Base44 app (checkpoint `6ab5ab3b`): `User.tenant_id`/`patient_id`/`app_role` `write:false`; `manageTenantUsers` writes under `data`, never hands out `platform_owner`, never pulls a user from another clinic. Pending Publish |
+| FamiliasConectadas | no | fixed in the Base44 app (checkpoint `6ab5ab3e`): `User.family_id`/`family_role` `write:false`; create/join/leave go through `joinFamily`. Pending Publish |
+| Sommel | no | fix in jospabloh/sommel#1: onboarding moved to `createWineBar`, `User.tenant_id`/`app_role` `write:false`, `WineBar` license fields platform-only |
 | AudioVisual Order Pro | no | no entity files in the workspace — nothing to check yet |
 
 The last three have no customer yet, which is the only reason they are not

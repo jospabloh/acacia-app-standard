@@ -1508,6 +1508,68 @@ live: they must be fixed before their first signup, not after.
 
 ---
 
+## 25. Signup finishes — the emailed code has a screen to type it into
+
+**Why this module exists.** On 2026-09-29 a new StockFlow customer
+(cesar@domsot.com.mx) could not create his tenant. He registered, the
+verification code reached his inbox, and he was stuck. Base44's
+`auth.register()` sends an OTP and leaves the account unverified;
+`loginViaEmailPassword()` then refuses with `Please verify your email before
+logging in. Check your email for the verification code.` StockFlow's Register
+page swallowed that failure, redirected to `/login`, and `/login` showed the
+same message with **no field to enter the code**: `verifyOtp` and `resendOtp`
+were never called anywhere in the app. Every step worked; the flow had no way
+to finish. It is the Module 10 "no dead ends" rule applied to the step before
+the first login, and it is invisible to the owner for the same reason as the
+Rumbo Apple-button incident: a stuck signup leaves no account to notice.
+
+**The rule.** Any app that offers email + password signup must, from the
+screen where the failure happens:
+
+1. Call `base44.auth.verifyOtp({ email, otpCode })` from an in-app field —
+   never rely on the user finding a link or on the platform's hosted page.
+2. Offer **resend** (`base44.auth.resendOtp(email)`) and a way back to change
+   the email. Codes expire; the mail goes to spam.
+3. Show the code step from **both** entry points: right after `register()`
+   when the automatic login fails, **and** on `/login` when login fails with
+   the unverified-email error. The second is what rescues an account that
+   already exists and is stuck. Detect the state by the error message
+   (`/verify your email|verification code/i`) — the SDK exposes no code.
+4. After a successful `verifyOtp`, log the user in with the credentials
+   already in memory (one step, no retyping) and land on the app; if that
+   login fails, send them to `/login` with a message, never a blank error.
+
+Google-only apps and apps with no password signup are exempt; record that in
+the audit line instead of skipping the module silently.
+
+**Reference implementation.** StockFlow: `src/components/VerifyEmailStep.jsx`
+(code field, resend, change email; exports `needsEmailVerification`), used by
+`Register.jsx` and `Login.jsx`, with `verifyOtp`/`resendOtp` on `AuthContext`.
+Copy it rather than rebuilding from prose.
+
+**How an audit proves it** (a grep is necessary, not sufficient):
+
+- `grep -rn "verifyOtp" src/` returns a call site reachable from **both**
+  `Register` and `Login`, and `resendOtp` is called too. No hit in an app that
+  has password signup is a failing audit on its own.
+- **Live, with a throwaway address** (use plus-addressing on an inbox you
+  control, e.g. `you+m25test@…`): register in the deployed app, do **not**
+  type the code, go to `/login`, and log in — the code field must appear.
+  Enter the code and confirm you land inside the app; repeat with "resend"
+  and confirm the new code works and the old one is refused. Delete the test
+  user afterwards. This needs an inbox, not the tenant's data, so it does not
+  hit Module 14's "no writing to a customer's tenant" limit.
+- The audit note says which of these ran. "Grep only" is a legitimate
+  result; claiming the live flow without running it is not.
+
+**Not yet audited across the portfolio (2026-09-29):** only StockFlow has been
+read for this. Every other app with password signup should be checked in its
+next audit — Rumbo, FlowFin, Puntos+, CtrlHQ, KitchOps, Liuma, CatéqHub, Radar
+and the newer apps. Do not assume they are fine because they share the SDK:
+the SDK provides the calls, not the screen.
+
+---
+
 ## Verification gates — what actually proves a module is live
 
 The recurring failure across this portfolio is not writing the code. It is
@@ -1536,6 +1598,7 @@ Each module's proof is a thing you can run and read.
 | 22 server-authoritative diffing | a write decision never trusts `auth.me()`'s cached view | grep every backend function for `user.data`/`caller.data`/`user.role` used in a comparison that gates a write — none should exist outside a fresh `asServiceRole` read |
 | 23 nav survives reload | the sidebar's active item and any manual expand/scroll state look right on the first frame after a reload | hard-reload on a deep route and confirm the highlight is correct immediately, then expand a group, reload again, confirm it's still expanded |
 | 24 tenant roles | no tenant role reaches every tenant | only platform accounts hold built-in `admin` in live `User`; `check-tenant-roles.mjs` green in CI; deployed schema matches the checked files |
+| 25 signup finishes | a new email+password user can activate their account | `grep -rn verifyOtp src/` reachable from Register **and** Login, `resendOtp` called; then live with a throwaway `+` address: register, skip the code, log in — the code field appears, the code lands you in the app |
 
 ---
 
@@ -1600,7 +1663,10 @@ Each module's proof is a thing you can run and read.
     render, and persists any non-route-derived UI state (expanded groups,
     scroll position) via `sessionStorage`, restored synchronously on mount
     (Module 23) — so a reload never visibly resets navigation chrome.
-21. Copy `CHECKLIST.md` from this repo into the new app's `CLAUDE.md`.
+21. If the app has email + password signup, give it an in-app verification-code
+    step reachable from both Register and Login (Module 25) and prove it with a
+    throwaway address before the first customer signs up.
+22. Copy `CHECKLIST.md` from this repo into the new app's `CLAUDE.md`.
 
 See [`CHECKLIST.md`](CHECKLIST.md) for the compact, copy-pasteable version of
 this list, and [`docs/incidents.md`](docs/incidents.md) for the full postmortems

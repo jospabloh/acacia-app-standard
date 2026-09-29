@@ -216,3 +216,10 @@ Security locks last checked for drift (Module 19): <date> — <deployed vs. repo
       writes `role: 'admin'`; `check-tenant-roles.mjs` from
       `shared/tenant-roles/` runs in CI; signup pings MC's `tenant-pull`.
 ```
+
+- [ ] Module 25 — Signup finishes: email+password signup has an in-app code
+      step (`verifyOtp`, `resendOtp`, change email) shown after `register()`
+      **and** on `/login` when login fails with the unverified-email error;
+      after verifying, the user is logged in without retyping. Proven with a
+      throwaway `+` address on the deployed app, not only by grep. StockFlow's
+      `VerifyEmailStep.jsx` is the reference.

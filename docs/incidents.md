@@ -5,6 +5,27 @@ Postmortems from across the portfolio that turned into a rule in
 standard stays a contract, not a story — but the story is why each rule exists,
 so read the relevant one before arguing a rule doesn't apply to your case.
 
+## StockFlow — the verification code had nowhere to be typed (2026-09-29)
+
+A new customer registered, received the emailed code, and could not create his
+tenant. Base44's `register()` leaves the account unverified until `verifyOtp`
+is called, and `loginViaEmailPassword()` refuses until then. StockFlow's
+Register page caught that login failure and redirected to `/login`, which
+showed Base44's "Please verify your email" message with no input for the
+code — `verifyOtp` and `resendOtp` were called nowhere in the app. It went
+unnoticed because every screen worked in isolation and a stuck signup creates
+no visible account; it surfaced only because the customer wrote to the owner.
+
+Fixed the same day (jospabloh/stockflow#412): a shared code step used by both
+Register and Login, so an already-stuck account could finish from `/login`
+too. Deployed and confirmed by content (the served bundle contains the new
+code). The live flow with a fresh unverified user was **not** run from the
+sandbox; the customer's own completion is the only evidence so far.
+
+Lesson: **Module 25**. The SDK supplies `verifyOtp`/`resendOtp`; it does not
+supply the screen, and no other module would have caught its absence. Other
+password-signup apps are unaudited for the same gap.
+
 ## StockFlow — a tenant's admin held the platform's role (2026-09-24)
 
 A new customer signed up and nothing told the platform owner; looking into

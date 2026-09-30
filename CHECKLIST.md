@@ -223,3 +223,11 @@ Security locks last checked for drift (Module 19): <date> — <deployed vs. repo
       after verifying, the user is logged in without retyping. Proven with a
       throwaway `+` address on the deployed app, not only by grep. StockFlow's
       `VerifyEmailStep.jsx` is the reference.
+
+- [ ] Module 26 — Function metadata: every `entry.ts` has a
+      `function.meta.json` (purpose, status, triggers, auth, tenant_scoped,
+      entities, tests, actions with callers, `remove_when` for one-off or
+      deprecated). CI fails on a missing meta, an undeclared or stale caller,
+      or a `cron:` trigger without an existing workflow. Delete a function only
+      with no callers, no deployed trigger and 7 days of captured logs showing
+      no invocation.

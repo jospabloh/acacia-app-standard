@@ -1568,6 +1568,84 @@ next audit — Rumbo, FlowFin, Puntos+, CtrlHQ, KitchOps, Liuma, CatéqHub, Rada
 and the newer apps. Do not assume they are fine because they share the SDK:
 the SDK provides the calls, not the screen.
 
+## 26. Every backend function says what it is for — `function.meta.json`
+
+**Why this module exists.** On 2026-09-30, while consolidating StockFlow's 47
+functions (cap 50, `maxFunctions` set to 47, headroom zero), nobody could say
+what `updateProductStockSafe` was for. The answer had to be dug out of `git
+log`: created 2026-03-30 for `MovementFormDialog`, orphaned 2026-04-20 when
+that caller was removed because it double-applied stock, and then **kept
+deployed and maintained for five months** — it even received the 2026-09-28
+security hardening — with zero callers. The same audit found five "cron"
+functions (`dailyPermissionAudit`, `dailyDocumentationAudit`,
+`cleanupSessions`, `dailyStockReconcile`, `sendCourseReminders`) that are
+deployed but **have no scheduler anywhere**: no Base44 workflow, no Mission
+Control cron, no GitHub Action. They look like running jobs in the repo and
+never run. Base44 keeps function logs for roughly 13 hours, so logs cannot
+answer "is this used?" either. The code is the only record, and the code did
+not say.
+
+**The rule.** Every directory with an `entry.ts`/`entry.js` has a
+`function.meta.json` next to it. It does not count against the 50-function
+cap (only `entry.*` does). CI fails without it.
+
+```json
+{
+  "name": "quotations",
+  "purpose": "Quotation CRUD and lifecycle (create, convert, deliver, cancel)",
+  "status": "active",
+  "created": "2026-03-26",
+  "triggers": ["frontend"],
+  "auth": "user",
+  "tenant_scoped": true,
+  "entities": { "reads": ["Quotation", "Client"], "writes": ["Quotation", "Movement"] },
+  "tests": ["base44/tests/integration_test.ts"],
+  "actions": {
+    "createQuotationSafe": { "purpose": "…", "callers": ["src/pages/Quotations.jsx"] }
+  },
+  "remove_when": null
+}
+```
+
+- `status`: `active` | `deprecated` | `one-off`. A `one-off` (migration,
+  backfill, owner repair) or `deprecated` function **must** set `remove_when`
+  (a date or a condition). A migration that stays deployed after it ran is a
+  slot and an attack surface spent on nothing.
+- `triggers`: any of `frontend`, `cron:<workflow name>`, `entity:<Entity>`,
+  `agent:<agent name>`, `backend:<function>`, `external:<system>` (e.g.
+  `external:mission-control`). A `cron:` trigger must name a workflow that
+  exists in `base44/workflows/` — that is the check that would have caught the
+  five unscheduled crons.
+- `auth`: `user` | `service_role` | `cron_secret` | `hmac` | `public`.
+- `tenant_scoped`: whether it filters by the tenant key (Module 14).
+- Routers (Module 11) list every `action` from `handlers/index.ts` under
+  `actions`, each with its own `purpose` and `callers`.
+
+**CI check** (extend `validate:functions`, already wired into `npm run lint`):
+
+1. Every endpoint directory has a valid `function.meta.json`.
+2. Every action exported by a router's `handlers/index.ts` appears in `actions`.
+3. Declared callers match reality: grep `invoke('<fn>'` / `action: '<a>'` in
+   `src/`, `base44/workflows/`, `base44/agents/` and backend handlers. An
+   undeclared caller, or a declared caller that no longer exists, fails.
+4. A `cron:` trigger whose workflow file does not exist fails.
+5. `one-off`/`deprecated` without `remove_when`, or past its `remove_when`, fails.
+6. The check regenerates `docs/FUNCTIONS_REGISTRY.md`, a readable index.
+
+**Deleting a function** needs three things written in the PR: the meta shows no
+callers, the deployed workflows (`GET /api/apps/{id}/workflows`, not the repo
+files) show no trigger, and at least 7 days of captured logs show no
+invocation. Because Base44 keeps logs for about 13 hours, "captured" means
+someone pulled them at least twice a day with `base44 logs` and stored them.
+Today's log window alone is not evidence.
+
+**Reference implementation.** StockFlow, during its function consolidation
+(wave 0, starting 2026-10). Until it lands, this module is a contract without
+a copyable script. Say so in audits instead of marking it done.
+
+**Not yet audited across the portfolio (2026-09-30):** no app has
+`function.meta.json` yet. Every app goes red on this module until it adds them.
+
 ---
 
 ## Verification gates — what actually proves a module is live
@@ -1599,6 +1677,7 @@ Each module's proof is a thing you can run and read.
 | 23 nav survives reload | the sidebar's active item and any manual expand/scroll state look right on the first frame after a reload | hard-reload on a deep route and confirm the highlight is correct immediately, then expand a group, reload again, confirm it's still expanded |
 | 24 tenant roles | no tenant role reaches every tenant | only platform accounts hold built-in `admin` in live `User`; `check-tenant-roles.mjs` green in CI; deployed schema matches the checked files |
 | 25 signup finishes | a new email+password user can activate their account | `grep -rn verifyOtp src/` reachable from Register **and** Login, `resendOtp` called; then live with a throwaway `+` address: register, skip the code, log in — the code field appears, the code lands you in the app |
+| 26 function metadata | every function says what it is for, and nothing is deployed that nothing calls | `npm run lint` green with the metadata check; `base44 functions list` equals the directories with `function.meta.json`; every `cron:` trigger matches an **active** workflow in `GET /api/apps/{id}/workflows` |
 
 ---
 
@@ -1666,7 +1745,9 @@ Each module's proof is a thing you can run and read.
 21. If the app has email + password signup, give it an in-app verification-code
     step reachable from both Register and Login (Module 25) and prove it with a
     throwaway address before the first customer signs up.
-22. Copy `CHECKLIST.md` from this repo into the new app's `CLAUDE.md`.
+22. Give every backend function a `function.meta.json` from the first commit
+    (Module 26), and wire the metadata check into `npm run lint`.
+23. Copy `CHECKLIST.md` from this repo into the new app's `CLAUDE.md`.
 
 See [`CHECKLIST.md`](CHECKLIST.md) for the compact, copy-pasteable version of
 this list, and [`docs/incidents.md`](docs/incidents.md) for the full postmortems

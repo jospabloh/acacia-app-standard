@@ -588,3 +588,31 @@ Four things this produced, all now in `STANDARD.md`:
   Having disproved one signal, the next step treated the absence of a different
   signal as proof — without opening the log. Disproving a false alarm says
   nothing about a signal you never read.
+
+## StockFlow — a function nobody could explain, and crons that never ran (2026-09-30)
+
+**What happened.** A consolidation audit of StockFlow's 47 functions (Base44
+cap 50, `maxFunctions` 47, headroom zero) needed to know which ones were in use.
+`updateProductStockSafe` had no caller anywhere: not in `src/`, workflows,
+agents, other repos or Mission Control. Its history had to be reconstructed
+from git. It was added 2026-03-30 for `MovementFormDialog` and orphaned
+2026-04-20, when that call was removed because it double-applied stock on top
+of the `syncProductStock` workflow. After that it stayed deployed. It was still
+maintained: the 2026-09-28 security sweep hardened it like every other function.
+Its audit-log line has never been written since. It also sets stock without a
+movement, which breaks the inventory single source of truth.
+
+The same audit found `dailyPermissionAudit`, `dailyDocumentationAudit`,
+`cleanupSessions`, `dailyStockReconcile` and `sendCourseReminders` deployed as
+"crons" with **no scheduler**. Only 3 workflows are active in the panel. The
+setup doc described crons that were never created, and the 09:00 audit did not
+appear in that day's logs.
+
+**Why it went unnoticed.** Base44 keeps function logs for about 13 hours, so
+nobody could look back to see what ran. The repo showed files, not whether
+anything called them. A function with an entry point looks alive whether or not
+anything reaches it.
+
+**What changed.** Module 26: a `function.meta.json` per function, CI that checks
+declared callers and triggers against the code and the workflows, and a
+deletion rule that needs 7 days of *captured* logs, not today's window.

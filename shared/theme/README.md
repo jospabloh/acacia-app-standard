@@ -52,6 +52,32 @@ ACACIA apps finds the same thing in the same corner of both.
    will fight, and a two-state toggle cannot express "follow the device"
    anyway.
 
+## Size: 44 px by default (2026-10-02)
+
+The resting circle and each slot of the open track are CSS variables,
+`--theme-switcher-size` and `--theme-switcher-slot`, and both default to
+**44 px** — the touch target a finger needs. They used to be a hardcoded
+40 px circle with 34 px slots, and because the control is on every screen of
+every app, LIUMA's phone audit (v1.9.0) found it under 44 px on all of them.
+An app that prefers the old look under a mouse sets it back for fine pointers
+only, from its own `index.css`:
+
+```css
+@media (pointer: fine) {
+  :root { --theme-switcher-size: 40px; --theme-switcher-slot: 34px; }
+}
+```
+
+Open, the track is `slot + 6 px` tall (50 px at the default): lift
+`--theme-switcher-bottom` if that crowds a bottom bar, and re-run the smoke
+suite's placement check at 390 px.
+
+**Copy-out pending** for every React app that still carries the 40/34 copy:
+`acacia-mission-control`, `puntos`, `rumbo`, `flowfin`, `stockflow`,
+`cateqhub`, `radar`, `ctrlhq`, `kitchops` (LIUMA already has it). The vanilla
+twin `theme-switcher.vanilla.js` (`acaciaco-site`) still draws 40/34 px and is
+a separate change.
+
 ## What the component needs from the app
 
 Semantic tokens only — `--background`, `--foreground`, `--card`, `--border`,

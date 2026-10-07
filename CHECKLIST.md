@@ -276,6 +276,38 @@ jospabloh/acacia-app-standard. Status:
       state exists. Rejecting asks twice, raises a ticket and is carried out
       as a cancellation by the licence lifecycle; nothing is deleted by a
       timer. Ships observing; the date enforcement was turned on is below.
+- [ ] Module 29 — Testimonials (STANDARD.md §29 is the contract of record): a
+      third intent, "Dejar un testimonio", inside the existing Soporte screen.
+      Fields: `rating` whole 1-5, `body` 20-600 after trimming, `author_name`
+      1-80 (prefilled), `author_role` 0-80 (prefilled with the business),
+      and a required, UNTICKED `consent_publish` box with the exact text
+      "Autorizo a ACACIA a publicar este testimonio, con el nombre que indico,
+      en acaciaco.com.mx." plus "Se publica después de que ACACIA lo revise."
+      Entity `Testimonial`, tenant-isolated (Module 4), written ONLY through
+      the app's Safe function (Module 3) with server-set `consent_at`,
+      `status: submitted`, the author, tenant id and `app_version`; one row
+      per user (resubmitting replaces it and renews `consent_at`). App status
+      is only `submitted | withdrawn`; the UI says "Enviado" / "Retirado" and
+      never "publicado". Any authenticated member of a `trial` or `active`
+      tenant can submit; withdrawing is allowed in any billing state;
+      deleting an account or tenant first marks it `withdrawn` (or deletes
+      the row) and pings. The BROWSER fires a secret-less, fire-and-forget
+      `POST /api/ingest/testimonial-pull` `{app, testimonialId}` after submit
+      and after withdraw (`.catch(() => {})`); its response reveals nothing.
+      `acaciaControl` answers `testimonials.get {id}` -> `{ok, record|null,
+      tenant_name}` and `testimonials.list {}` -> `{ok, records}` (full list,
+      withdrawn included, no `since`), tenant id normalised to `tenant_id`, no
+      email or user id, signed per Module 15; an unimplemented action answers
+      `unknown action: <action>`. Handlers live in an existing router, no new
+      function (Module 11), listed in `function.meta.json`. Review state lives
+      ONLY in Mission Control; the bodega erases the content on withdraw (that
+      is how Module 28's deletion rule is met there). Nobody seeds, edits or
+      invents a testimonial. The notice names publication of testimonials as
+      a consent-based purpose and `Testimonial` is in the data inventory with
+      retention BEFORE this ships (Module 28); no notice-version field, the
+      text is fixed and `consent_at` is the record. Proven on the deployed
+      app: a test submission is `pending` in MC, approved, returned by
+      `GET /api/testimonials`, then withdrawn, erased in the bodega and gone.
 
 Last audited against the standard: <date> — <what changed / what's still open>
 Last multi-tenant isolation audit: <date> — <scope, findings, what's unverified>

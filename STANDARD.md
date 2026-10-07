@@ -2249,6 +2249,257 @@ is red on this module.
 
 ---
 
+## 29. Testimonials — collected in the app, reviewed in Mission Control, published on the site
+
+**Why this module exists.** On 2026-10-07 the owner asked for one thing: existing
+tenants should be able to leave a testimonial from inside the app, from 1 to 5
+stars, and have it appear on acaciaco.com.mx after review. The pieces already
+exist (a support screen, a ticket ping, a signed bridge, a public site); the
+risk is building them nine different ways, or publishing a person's words
+without a consent anyone can prove. The shared part is the **contract**, not
+code: each app's Soporte screen differs, so there is nothing in `shared/` for
+this module.
+
+**This module is the contract of record.** Mission Control's own docs point
+here, not to the owner's request or to any spec file. If the implementation in
+an app, in Mission Control or on the site differs from this text, one of them
+is wrong and both are corrected in the same change.
+
+**The rule.** A testimonial is written **first** in the app's own backend,
+reported to Mission Control the moment it is written or withdrawn, **reviewed
+only in Mission Control**, and published by Mission Control's public endpoint
+— never by the app, never by hand on the site. Nothing is published without
+the person's explicit, recorded consent. Nobody invents, seeds or rewrites a
+testimonial.
+
+### 1. What the app provides
+
+**An entry point inside the existing Soporte screen (Module 8), as a third
+intent: "Dejar un testimonio".** Not a new page, not a new menu item.
+
+**Fields and limits.** The app validates them and Mission Control validates
+them again (§4); the server-side check in the app is the one that counts, the
+client's `maxLength` is a courtesy.
+
+| field | rule |
+|---|---|
+| `rating` | whole number 1–5, type number, required |
+| `body` | text, 20–600 characters after trimming spaces, required |
+| `author_name` | 1–80 characters, how the person wants to appear, prefilled with their name |
+| `author_role` | 0–80 characters, optional, prefilled with the business name (e.g. "Dueña · Baristop") |
+| `consent_publish` | checkbox, required, **unticked by default** |
+
+The checkbox text is exactly: **"Autorizo a ACACIA a publicar este testimonio,
+con el nombre que indico, en acaciaco.com.mx."** The form also shows:
+**"Se publica después de que ACACIA lo revise."** The server refuses a write
+where `consent_publish` is not literally `true`; hiding the box is not a
+consent. Prefilled values are suggestions the person can change.
+
+**An entity `Testimonial`, isolated by tenant** (Module 4's four-op `$or`
+shape; Module 14's audit), written **first** in the app's backend **only
+through the app's Safe-function path** (Module 3: the function re-derives the
+tenant and the user server-side and re-checks `billing_status`; the entity's
+client `rls.write` is closed, so the browser never writes it directly). Each
+row holds `rating`, `body`, `author_name`, `author_role`, `consent_publish`,
+`consent_at`, `status`, the author (the user), the tenant's id and
+`app_version`.
+- **`consent_at` is the server's clock**, set by the function when it writes,
+  never taken from the request. It is the record of consent.
+- **`status` in the app takes only `submitted | withdrawn`.**
+- **One row per user.** Sending another testimonial **replaces the same row**
+  and **renews `consent_at`**. It does not create a second one.
+- **The user can withdraw it** (`status: "withdrawn"`). The screen shows the
+  person their current testimonial and a "Retirar" action.
+- **The app never shows "published", "approved" or a star count from the
+  site.** It shows **"Enviado"** and **"Retirado"**. Review state exists only
+  in Mission Control, and the app has no way to know it.
+
+**Who may submit.** Any authenticated member of a tenant whose `billing_status`
+is `trial` or `active`. A `view_only` or `suspended` tenant is refused by the
+Safe function (Module 3's gate), and the entry point says why instead of
+failing. **Withdrawing is allowed in any billing state.**
+
+**Deleting an account or a tenant** (Module 7's danger zone): the app first
+marks the person's testimonials `withdrawn` (or deletes the row), **then fires
+the ping**. A row left `submitted` for a tenant that no longer exists would
+stay published.
+
+**No new backend function if an existing router can host the handler**
+(Module 11). The Safe write, the withdraw and the two bridge actions are
+handlers under an existing router and `acaciaControl`; they cost no slot. A new
+`entry.*` for this is a review failure unless the app has no router that can
+host it. Each new action is listed in the host router's `function.meta.json`
+`actions` with its `callers` (Module 26). This limit is about **apps** (50
+functions on Base44); Mission Control has its own budget (§6).
+
+### 2. The ping — from the browser, after submit and after withdraw
+
+After the write succeeds, **the browser** fires
+`POST https://control.acaciaco.com.mx/api/ingest/testimonial-pull` with
+`{ "app": "<the app's id in Mission Control>", "testimonialId": "<id>" }`,
+`.catch(() => {})`. Fire it **after submitting and after withdrawing** (and
+after the deletion in §1), so a withdrawal reaches Mission Control in seconds,
+not the next morning.
+
+It has the same shape and reasoning as `ticket-pull` in Module 8: **no
+secret**, **no function slot**, and **the body is not trusted** — Mission
+Control takes only the id and reads the real record back over the bridge. **The
+response reveals nothing**: `{ "ok": true }` with 200 whenever the request is
+well formed, whether or not the id exists (400 only for an invalid shape). A
+ping that fails must never cost the person their testimonial; the daily sync
+is the backstop.
+
+### 3. The bridge — two actions on `acaciaControl`, exact shapes
+
+Signed like every other bridge call (Module 15: the per-app derived key; no new
+auth path, no bearer). Both are read-only; Mission Control never writes a
+testimonial into the app.
+
+`testimonials.get` `{ "id": "<id>" }` →
+
+```json
+{ "ok": true,
+  "record": { "id": "…", "rating": 5, "body": "…", "author_name": "…", "author_role": "…",
+              "consent_publish": true, "consent_at": "…", "status": "submitted",
+              "tenant_id": "…", "created_date": "…", "updated_date": "…", "app_version": "…" },
+  "tenant_name": "…" }
+```
+
+and, if the id does not exist, `{ "ok": true, "record": null }`.
+
+`testimonials.list` `{ }` →
+
+```json
+{ "ok": true, "records": [ { /* the same record */ "tenant_name": "…" } ] }
+```
+
+- **Always the app's full list, `withdrawn` included.** There is no `since`:
+  the volume is one row per user, and the full list is what lets Mission
+  Control notice rows that were deleted.
+- **The bridge normalises the tenant's id to the field `tenant_id`**, whatever
+  the entity calls it (`business_id`, `family_id`, `parish_id`…).
+- **It never returns an email or a user id.**
+- **An action the app does not implement answers with the exact message
+  `unknown action: <action>`.** Mission Control's daily sync skips such an app
+  silently; any other bridge failure is reported as an error of that section.
+
+### 4. Mission Control — the bodega (context; the app does not reimplement it)
+
+A `testimonials` table with its own review state **`pending | approved |
+rejected | withdrawn`**, upserted by `(app_id, external_id)`.
+
+**Validation on receipt is fail-closed.** A record is *publishable* only if
+`status === "submitted"`, `consent_publish === true`, `consent_at` is a valid
+date, `rating` is a whole number 1–5 and the texts meet §1's limits. Any other
+`status`, missing consent or invalid record counts as **withdrawn**.
+
+| what arrives | what Mission Control does |
+|---|---|
+| publishable, no row yet | row `pending`, notify |
+| publishable, row `pending`, content changed | stays `pending`, row updated, no notification |
+| publishable, row `approved` or `rejected`, content changed | back to `pending`, notify |
+| publishable, row `withdrawn` | `pending`, notify |
+| publishable, unchanged | nothing |
+| withdrawn / invalid / no consent, row exists | row `withdrawn` **and the content is erased in the bodega** (`body`, `author_name`, `author_role` emptied, `consent_publish` false) |
+| withdrawn / invalid / no consent, no row | nothing is stored |
+| id no longer in the app (`record: null`, or absent from a `list` that answered correctly), row exists | treated as withdrawn |
+
+**Erase-on-withdraw is how Module 28's deletion rule is met in the bodega** —
+"deletion reaches every place the inventory says the data is kept, including
+Mission Control's bodega". Withdrawing in the app removes the personal data
+from the bodega as well; nothing separate runs and nothing waits for a timer.
+
+A notification is a row in `alerts` (`kind: 'testimonial'`) plus an email to
+`SUPPORT_ALERT_EMAILS`, **at most one per hour per testimonial**
+(`notified_at`). The daily sync is the backstop: it calls `testimonials.list`
+for each app and picks up what no ping delivered.
+
+### 5. Review — the "Testimonios" page (role `admin`)
+
+Tabs Pendientes / Aprobados / Rechazados. Actions: **Aprobar**
+(`pending|rejected → approved`), **Rechazar** (`pending → rejected`),
+**Despublicar** (`approved → rejected`). A `withdrawn` row cannot be reviewed.
+**The text is never edited.** Each action sends the `updated_at` of the row the
+reviewer saw; if the row changed since, the server answers 409 and the page
+reloads, so nobody approves text they did not read. Every decision goes
+through `audit()`.
+
+### 6. Public endpoint and site
+
+`GET https://control.acaciaco.com.mx/api/testimonials` (optional
+`?app=<site slug>`): no authentication, CORS `*`, edge-cached, **approved rows
+with consent only**:
+
+```json
+{ "ok": true,
+  "items": [ { "app": "puntos-plus", "rating": 5, "body": "…", "author_name": "…",
+               "author_role": "…", "month": "2026-10" } ],
+  "summary": { "puntos-plus": { "count": 1, "average": 5 } } }
+```
+
+`app` is the **site's** slug (`puntos-plus`, not `puntos`); `month` is
+`YYYY-MM` of the approval in the **America/Mexico_City** time zone. Nothing
+else leaves: no email, no ids, no tenant name, no reviewer. It is **its own
+Mission Control function** for as long as it fits the plan's 12-function cap
+on `api/`.
+
+`scripts/testimonials.js` on the site renders the approved ones on each app's
+page and on the home page; with none approved, **the section does not appear**
+— no placeholder, no sample.
+
+### 7. Personal data (Module 28)
+
+A testimonial is a person's name, words and business, published on a public
+site: a purpose that **needs consent**, because the service does not depend on
+it. Therefore:
+- The integral notice at `acaciaco.com.mx/legal/privacidad` names
+  **"publicación de testimonios, con consentimiento"** as a purpose, the data
+  it covers, that it goes to Mission Control's bodega and the public site, and
+  how a person withdraws, **before the feature is switched on in production**.
+- `Testimonial` enters `privacy/data-inventory.json` with a retention period
+  tied to an event, and the form shows the simplified notice like every form a
+  person fills in themselves.
+- **No separate notice-version field in v1.** The consent text is fixed by this
+  standard (§1), so `consent_at` is the record. If the text ever changes, this
+  module changes with a new version and the question is reopened then.
+- Withdrawal (the app) and erase-on-withdraw (the bodega, §4) are how the
+  person takes their words back everywhere the inventory lists.
+
+### What the app must not do
+
+- Show "publicado", "aprobado" or a star count on its own authority.
+- Seed, edit, translate, "improve" or invent a testimonial — in a migration, a
+  demo tenant, a screenshot, a fixture that reaches production, or the site's
+  markup. A test submission is a real row and is withdrawn afterwards.
+- Publish without `consent_publish === true` and a server-set `consent_at`; a
+  replacement renews the consent, it never inherits the old one.
+- Take the tenant, the user or the time from the request body.
+- Create a second testimonial for a user.
+- Add a function slot for it when a router can host it.
+- Put a secret in the ping or trust what comes back from it.
+
+### Why
+
+Each rule is the cheapest form of one failure: a quote attributed to a real
+person that they did not approve. The review state sits in one place because
+two places disagree. The ping carries no secret and trusts nothing for the
+reason `ticket-pull` does, and the bridge goes through Module 15's key because
+a testimonial is exactly the record whose provenance (*this app, this tenant*)
+a forged body would fake. Validation fails closed and withdrawal erases because
+the safe error is "not published". And the notice comes first because Module
+28's point is that the document describes the app that is actually deployed.
+
+**Reference implementation.** None yet. Until one is live and has passed the
+gate below, this module is a contract without a copyable script. Say so in
+audits instead of marking it done.
+
+**Not yet audited across the portfolio (2026-10-07).** No app has the third
+intent, the entity or the two bridge actions; the site has no
+`scripts/testimonials.js`; and the integral notice does not yet name this
+purpose. Every app is red on this module.
+
+---
+
 ## Verification gates — what actually proves a module is live
 
 The recurring failure across this portfolio is not writing the code. It is
@@ -2281,6 +2532,7 @@ Each module's proof is a thing you can run and read.
 | 26 function metadata | every function says what it is for, and nothing is deployed that nothing calls | `npm run lint` green with the metadata check; `base44 functions list` equals the directories with `function.meta.json`; every `cron:` trigger matches an **active** workflow in `GET /api/apps/{id}/workflows` |
 | 27 `mario_style` (optional) | if adopted: the app has the style and celebrates only finishing | `src/styles/mario_style.css` and `src/lib/celebrate.js` byte-identical to `shared/mario_style/` (`cmp`); every `celebrate(` call sits after an awaited write, outside `catch`; layout scanner **and** screenshots clean at 320/390/834/1440 in light and dark on the **deployed** bundle. N/A for apps that did not adopt it |
 | 28 personal data | one notice describes every deployed app, consent is obeyed, and a request reaches a person | `acaciaco.com.mx/legal/privacidad` is served with a full address, the six items of art. 15 and a section for this app, and the PR that last changed it names the lawyer who read it; the app links to it from login, signup and About, and **every** form a person fills in themselves shows the simplified notice with its five parts, naming as sensitive any sensitive data that form asks for; the inventory check is green on the PR against the repo's entity files and green again against the **deployed** schema (`list_entity_schemas`) after the entities were deployed; read the app's section of the served notice against the inventory line by line — every kind of data, every kind of person, everything sensitive or about minors, **every use**, the ones that need no consent as much as the ones that do, every automated decision, every recipient, every retention period — and find nothing in one that is missing from the other; read the inventory's data outside entities against the running app (what sign-in holds, a session, a function log, an upload, the browser's storage, each provider's copy of a message) and find nothing there that the file omits; for **every** use that needs consent, decline it as one person and accept then revoke it as another, and confirm the function behind that use does nothing for either while it still acts for someone who accepted; at **every** form that asks for financial or sensitive data, withhold the express consent and confirm the form is refused and nothing is stored — and where a processor's hosted card field is involved, that the field is not in the page and no request has gone to the processor until the consent is recorded — then give it, revoke it, and confirm the function that used that data stops; where the data is sensitive, try to give that consent signed out and without the confirmed code or signature and confirm it is refused; where the person may be a minor, try the flow as the minor with no responsible adult and confirm it is refused; change how the notice describes one optional use and one third-party transfer that two test people had accepted, one with an account and one without, and confirm the first is shown the change at next login, the second is asked at their next form, neither use is acted on for either until answered again, and their other choices stand; raise an `arco` request from an account and another with no account, and read back for each its folio, its date to answer by and who it reached, then answer one in the person's favour and read back the separate date to act by; with no account, send an access, a rectification, a cancellation and an objection each twice, once with a valid identity document and once with someone else's, and confirm the first of each pair is carried out and the second releases nothing and changes nothing; read what the access request returned against the inventory and find every datum the app holds about that person, from every place it is kept, the bodega and the providers included; for **every** way the tenant's staff can enter people's data, a form or an import, run it and find either the tenant's statement that those people have its notice, recorded on that entry, or the notice sent to each of them and logged, and where a person has no usable contact confirm the tenant is told who received nothing; where such an entry carries financial or sensitive data, submit it without the tenant's statement about consent and confirm it is refused, then with it and find the statement stored; for **every** kind of person the app holds, carry one deletion and one rectification through and read back the record of what was done in each place the inventory lists, the bodega included; for **every** automated decision the app makes about people, record one person's objection and confirm the function stops applying it to them and still applies it to others; confirm **every** kind of data in the inventory has a retention period tied to an event, none open-ended, then for each period seed data older than it, run what enforces it, and read back the same record for each place that data was kept; for a multi-tenant app, take a tenant and blank its name, then its address, then its privacy contact, and find **every** one of its public forms unpublished each time; with all three filled, read the simplified notice each form serves and find the tenant named as responsable with that address, and follow its link to an integral notice that loads; and read the tenant terms as deployed and find each commitment of rule 3's data-processing clause: instructions only, confidentiality, security, providers named, help with ARCO, return or deletion on exit; open the app's `CLAUDE.md` and find the breach runbook of rule 9 complete: who decides, the message to send, where the record goes, and for a multi-tenant app that the tenant is told first; and for rule 10: try to create a tenant without accepting and get a refusal; call the deciding function as a staff user of a tenant and get a refusal, and again as the platform's `admin` naming that tenant and get a refusal; accept as a tenant admin and read back the row — version and hash equal to the served `legal/version.json`, who, server time — and the tenant's current state; try to write, update and delete such a row from the client and get three refusals; point the app at a manifest with a newer version and confirm the admin is asked again with `changes_es` shown, that the date of that first asking is recorded, that the earlier row is untouched, and that a staff user of the same tenant sees nothing and can still write; with enforcement on, move that date back past the grace period and confirm the admin cannot postpone while staff still write, then confirm a tenant with no such date is not held at all; reject, confirm on the second screen, and find the row, the ticket in Mission Control, and the tenant still working; accept afterwards and find both rows and a second ticket; reject again, set the tenant to `suspended`, and confirm accepting still works there while every other write is refused; make the acceptance write fail while a tenant is being created and find no tenant left behind; make the manifest unreachable and confirm nothing changes for a tenant that had decided or one that had not, that a decision attempted then is not recorded and the admin is told to retry and is let through even with the grace period over, and that creating a tenant fails the same way and leaves nothing behind |
+| 29 testimonials | a testimonial travels app → review → site only with consent, and can be taken back | on the **deployed** app, as a member of a `trial`/`active` tenant: submit a test testimonial without the box (refused, nothing stored), then with it, and read back the row — `status: submitted`, `consent_at` equal to the server's time and renewed by a second submission, the tenant's id, still one row; see it in Mission Control as `pending` within seconds (the ping), and the ping's response is `{ "ok": true }` for a real and for an unknown id; call `testimonials.get` and `testimonials.list` and compare the JSON to §3 field by field (tenant under `tenant_id`, `record: null` for an unknown id, withdrawn rows in the list, no email or user id), and an unimplemented action answers exactly `unknown action: <action>`; approve it and find it in `GET /api/testimonials` (`?app=<site slug>`) with exactly `app, rating, body, author_name, author_role, month` and nothing else; edit it in the app and find it `pending` again and gone from the public endpoint; reject it, edit it, and find it `pending`; withdraw it and find it `withdrawn` in Mission Control with `body`, `author_name` and `author_role` **empty in the bodega** and absent from the endpoint; with the ping blocked, submit another and find it in Mission Control after *Sincronizar ahora* (the `testimonials.list` backstop), then delete its row in the app and find it withdrawn and erased after the next sync; delete a test account or tenant and find its testimonial withdrawn or gone in the app and the bodega; from a `view_only` tenant a new submission is refused and a withdrawal is accepted; from a `suspended` tenant, and with another tenant's id or a forged `consent_at` in the body, the Safe function refuses or ignores them; a review sent with a stale `updated_at` answers 409; the UI says "Enviado"/"Retirado" and grep finds no client-side write to `Testimonial` and no "publicado"/"aprobado" text not read from Mission Control; `npm run validate:functions` green with no new `entry.*`; the served `legal/privacidad` names publication of testimonials as a consent-based purpose and `Testimonial` is in the inventory, **before** the feature was switched on. Withdraw every test row afterwards and confirm it is gone from the public endpoint |
 
 ---
 
@@ -2364,7 +2616,15 @@ Each module's proof is a thing you can run and read.
     section to the portfolio notice in `acaciaco-site`, link to it from
     login, signup and About, and put the simplified notice at every form —
     all **before the first real person's data is stored**.
-25. Copy `CHECKLIST.md` from this repo into the new app's `CLAUDE.md`.
+25. Add the testimonial intent to the Soporte screen (Module 29): the
+    `Testimonial` entity with tenant RLS, the Safe-function write and
+    withdraw hosted in an existing router, the browser ping to
+    `testimonial-pull` after submit and after withdraw, withdrawal on
+    account/tenant deletion, and the `testimonials.get` / `testimonials.list`
+    bridge actions with the exact shapes of §3. Ship it only after the privacy
+    notice names the purpose and the inventory lists `Testimonial` (Module
+    28), and prove it with one test testimonial that you then withdraw.
+26. Copy `CHECKLIST.md` from this repo into the new app's `CLAUDE.md`.
 
 See [`CHECKLIST.md`](CHECKLIST.md) for the compact, copy-pasteable version of
 this list, and [`docs/incidents.md`](docs/incidents.md) for the full postmortems

@@ -231,8 +231,8 @@ jospabloh/acacia-app-standard. Status:
       colour unchanged. `celebrate()` only after a successful write that
       finishes something. Verified with screenshots in both themes at
       320/390/834/1440 on the deployed bundle. Guideline: STANDARD.md §27.
-- [ ] Module 28 — Personal data: applies to any app with accounts (the
-      account email counts). ONE notice for the whole portfolio lives at
+- [ ] Module 28 — Personal data: applies to any app that handles a
+      person's data, stored or only passed on (the account email counts). ONE notice for the whole portfolio lives at
       acaciaco.com.mx/legal/privacidad; this app links to it from login,
       signup and About, never copies its text, and shows a simplified notice
       at every form a person fills in themselves. `privacy/data-inventory.json`
@@ -258,7 +258,9 @@ jospabloh/acacia-app-standard. Status:
       record of what was done in every place the data was kept; every
       retention period has a scheduled job that enforces it. A person can
       object to an automated decision and the function stops applying it. No security
-      or compliance claim nobody can prove.
+      or compliance claim nobody can prove. This file names who decides a
+      breach must be reported, the message to send and where the record
+      goes.
 
 Last audited against the standard: <date> — <what changed / what's still open>
 Last multi-tenant isolation audit: <date> — <scope, findings, what's unverified>

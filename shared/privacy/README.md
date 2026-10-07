@@ -1,6 +1,6 @@
-# shared/privacy — Module 27
+# shared/privacy — Module 28
 
-Templates for [Module 27](../../STANDARD.md#27-personal-data--the-privacy-notice-describes-the-app-that-is-actually-deployed).
+Templates for [Module 28](../../STANDARD.md#28-personal-data--the-privacy-notice-describes-the-app-that-is-actually-deployed).
 There is no checker here yet: the first app that writes the inventory check
 contributes it back.
 
@@ -15,11 +15,11 @@ contributes it back.
    not from the repo files. Then fill the six `stores`: they hold personal
    data no schema lists.
 2. For each entity decide `acacia_role`. If any is `encargado`, the tenant
-   terms need the data-processing clause (Module 27, rule 2).
+   terms need the data-processing clause (Module 28, rule 2).
 3. Fill the template from the inventory. Every `[…]` is a decision; none may
    reach production.
 4. A lawyer admitted in Mexico reviews the result. Name them in the PR.
-5. Publish, then run Module 27's verification gate.
+5. Publish, then run Module 28's verification gate.
 
 ## What the templates are not
 

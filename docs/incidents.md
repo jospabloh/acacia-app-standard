@@ -645,8 +645,8 @@ different repo from every app. Adding an entity with a phone number changes
 nothing there, and no check connects the two. The notice was last edited
 2026-04-28; the apps have changed many times since.
 
-**What changed.** Module 27: a `privacy/data-inventory.json` per app that CI
+**What changed.** Module 28: a `privacy/data-inventory.json` per app that CI
 keeps equal to the schema, the notice written from it, ACACIA's role decided
 per data category, an ARCO path through Module 8, and deletion that reaches
 Mission Control's bodega. Nothing was fixed in any app or on the site by this
-entry; every app is red on Module 27 until it does the work.
+entry; every app is red on Module 28 until it does the work.

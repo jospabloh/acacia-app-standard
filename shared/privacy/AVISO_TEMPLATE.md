@@ -1,4 +1,4 @@
-# Plantillas de aviso de privacidad — Módulo 27
+# Plantillas de aviso de privacidad — Módulo 28
 
 Estructura, no texto legal. Cada `[…]` es una decisión que alguien toma y
 ningún corchete llega a producción. Una persona abogada con cédula en México

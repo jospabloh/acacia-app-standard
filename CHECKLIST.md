@@ -206,24 +206,17 @@ jospabloh/acacia-app-standard. Status:
       expanded group, a scroll position) persists across a reload via
       `sessionStorage`, restored synchronously on mount.
 
-Last audited against the standard: <date> — <what changed / what's still open>
-Last multi-tenant isolation audit: <date> — <scope, findings, what's unverified>
-Secrets last read back: <date> — <which ones, and how each was proven>
-Security locks last checked for drift (Module 19): <date> — <deployed vs. repo, any found open>
 - [ ] Module 24 — Tenant roles: built-in `admin` held only by platform
       accounts (read `User` live); every non-platform `user_condition` sits
       inside an `$and` with the tenant match; signup/role-change code never
       writes `role: 'admin'`; `check-tenant-roles.mjs` from
       `shared/tenant-roles/` runs in CI; signup pings MC's `tenant-pull`.
-```
-
 - [ ] Module 25 — Signup finishes: email+password signup has an in-app code
       step (`verifyOtp`, `resendOtp`, change email) shown after `register()`
       **and** on `/login` when login fails with the unverified-email error;
       after verifying, the user is logged in without retyping. Proven with a
       throwaway `+` address on the deployed app, not only by grep. StockFlow's
       `VerifyEmailStep.jsx` is the reference.
-
 - [ ] Module 26 — Function metadata: every `entry.ts` has a
       `function.meta.json` (purpose, status, triggers, auth, tenant_scoped,
       entities, tests, actions with callers, `remove_when` for one-off or
@@ -231,8 +224,14 @@ Security locks last checked for drift (Module 19): <date> — <deployed vs. repo
       or a `cron:` trigger without an existing workflow. Delete a function only
       with no callers, no deployed trigger and 7 days of captured logs showing
       no invocation.
-
-- [ ] Module 27 — Personal data: `privacy/data-inventory.json` lists every
+- [ ] Module 27 — `mario_style` (OPTIONAL — write N/A if this app doesn't use
+      it): `src/styles/mario_style.css` and `src/lib/celebrate.js`
+      byte-identical to `shared/mario_style/`; the seven `--play-*` variables
+      mapped to this app's tokens; `--radius: 1rem`; Baloo 2 + Nunito; brand
+      colour unchanged. `celebrate()` only after a successful write that
+      finishes something. Verified with screenshots in both themes at
+      320/390/834/1440 on the deployed bundle. Guideline: STANDARD.md §27.
+- [ ] Module 28 — Personal data: `privacy/data-inventory.json` lists every
       entity that holds a person's data (category, titular, whether minors,
       ACACIA's role, purposes with `requires_consent`, recipients including
       Mission Control's bodega, retention, deletion) and CI fails on an entity
@@ -248,8 +247,14 @@ Security locks last checked for drift (Module 19): <date> — <deployed vs. repo
       recorded by notice version at every collection point, keyed to the
       titular (not only account users); express for financial data; no sensitive
       data by default. A named person or department handles ARCO; a request is
-      a Module 8 ticket of category `arco` with folio and due date. Deleting a person anonymizes the personal fields, keeps
-      the transaction, and reaches the bodega. No security or compliance claim
-      nobody can prove. Reviewed by a lawyer before publishing.
+      a Module 8 ticket of category `arco` with folio and due date. Deleting
+      a person anonymizes the personal fields, keeps the transaction, and
+      reaches the bodega. No security or compliance claim nobody can prove.
+      Reviewed by a lawyer before publishing.
 
-Privacy notice last checked (Module 27): <date> — <inventory vs. deployed schema, law/Reglamento re-read, who reviewed>
+Last audited against the standard: <date> — <what changed / what's still open>
+Last multi-tenant isolation audit: <date> — <scope, findings, what's unverified>
+Secrets last read back: <date> — <which ones, and how each was proven>
+Security locks last checked for drift (Module 19): <date> — <deployed vs. repo, any found open>
+Privacy notice last checked (Module 28): <date> — <inventory vs. deployed schema, law/Reglamento re-read, who reviewed>
+```

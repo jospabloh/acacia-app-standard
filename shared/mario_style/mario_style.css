@@ -36,9 +36,15 @@
 .play-press {
   --play-shade: color-mix(in srgb, var(--play-fill, var(--play-primary, #2f6bf2)) 72%, #000);
   box-shadow: 0 var(--play-lift) 0 var(--play-shade);
-  transition: transform .08s ease, box-shadow .08s ease, filter .15s ease, background-color .15s ease;
+  transition: transform .08s ease, box-shadow .08s ease, background-color .15s ease;
 }
-.play-press:hover:not(:disabled) { filter: brightness(1.06); }
+/* Hover lifts the button instead of tinting it: a brightness filter lightened
+   the fill under white text and cost contrast (Grafito: 4.76 → 4.31:1). The
+   fill colour, and so the text contrast, never changes on hover or press. */
+.play-press:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 calc(var(--play-lift) + 1px) 0 var(--play-shade);
+}
 .play-press:active:not(:disabled) {
   transform: translateY(calc(var(--play-lift) - 1px));
   box-shadow: 0 1px 0 var(--play-shade);
@@ -87,7 +93,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .play-press, .play-lift-hover { transition: none; }
-  .play-press:active:not(:disabled) { transform: none; }
+  .play-press:hover:not(:disabled), .play-press:active:not(:disabled) { transform: none; }
   .play-lift-hover:hover { transform: none; }
   .play-pop, .play-wiggle, .play-rise { animation: none; }
 }

@@ -266,13 +266,15 @@ jospabloh/acacia-app-standard. Status:
       object to an automated decision and the function stops applying it. No security
       or compliance claim nobody can prove. This file names who decides a
       breach must be reported, the message to send and where the record
-      goes. The tenant's admin accepts the terms (which carry the
+      goes. A tenant admin accepts the terms (which carry the
       data-processing conditions) once per version: the backend reads the
       version from acaciaco.com.mx/legal/version.json, records who, when,
-      which version and its hash in rows that are only added, refuses to
-      create a tenant without it, gives existing tenants the grace period,
-      then makes an undecided or rejecting tenant read-only server-side.
-      Rejecting asks twice and raises a ticket; nothing is deleted by a
+      which version and its hash in rows that are only added, and makes the
+      acceptance part of creating a tenant. An existing tenant's admin gets
+      the grace period from the first time the app asks, then must decide to
+      get past that screen; staff are never stopped and no second read-only
+      state exists. Rejecting asks twice, raises a ticket and is carried out
+      as a cancellation by the licence lifecycle; nothing is deleted by a
       timer. Ships observing; the date enforcement was turned on is below.
 
 Last audited against the standard: <date> — <what changed / what's still open>

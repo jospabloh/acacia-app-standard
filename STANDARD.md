@@ -1653,6 +1653,266 @@ a copyable script. Say so in audits instead of marking it done.
 
 ---
 
+## 27. Personal data — the privacy notice describes the app that is actually deployed
+
+**Why this module exists.** On 2026-10-07 the privacy notice of a competing
+Mexican SaaS (condominium management) was read next to its own marketing
+page. The notice was long, formal and wrong in the ways that matter: it cited
+articles 15, 16 and 37 of a law that was abrogated in March 2025 and a
+regulation article by number, it sent complaints to an authority that does not
+handle them, it described a product that only reads QR codes while the home
+page of the same site sold card payments, financial statements, vehicle and
+visitor registries, and it asked for consent "by signing at the foot of this
+document" on a web page nobody signs. Nothing in it was checked against the
+app.
+
+The same read of ACACIA's own notice (`acaciaco-site/legal/privacidad.html`,
+dated 2026-04-28) found the mirror image: short, honest, and incomplete. It
+names four of eleven apps, gives "Aguascalientes, Aguascalientes, México" as
+the address, does not say which purposes need consent, offers no way to limit
+use or disclosure, describes no way to revoke consent, and covers only what
+the *site's* forms collect. It says nothing about the data that tenants load
+into the apps about their own customers, employees and suppliers, which is
+most of the personal data this portfolio holds. And nothing in any app repo
+records what personal data that app stores, so no notice could be checked
+against anything.
+
+The failure is the one this standard keeps finding (see *Verification gates*):
+a document asserted something about the system, and nobody could run a check
+that would prove it false.
+
+**The law this module is written against.** The *Ley Federal de Protección de
+Datos Personales en Posesión de los Particulares* published in the DOF on
+**2025-03-20** (texto vigente, last reform DOF 2025-11-14), which abrogated
+the 2010 law of the same name. The authority is the **Secretaría
+Anticorrupción y Buen Gobierno** (art. 2 XV; the INAI no longer exists).
+Article numbers below are from that text as read on 2026-10-07. As of that
+date no new *Reglamento* had been found: the 2025 decree gave the Executive 90
+days, secondary sources say it has not been issued, and the 2011 Reglamento
+has not been abrogated — a DOF record either way was not located. Which role
+ACACIA holds for each kind of data is a legal judgement this module states as
+a working assumption. This is an engineering contract, not legal advice: **a
+lawyer admitted in Mexico reviews each notice before it is published**, and
+that review is a line in the PR, not an assumption.
+
+**Scope.** Any app that stores a datum about an identifiable natural person
+beyond the signed-in account's own email. In practice that is every app in the
+portfolio: a customer's phone in StockFlow, a family member in FlowFin, a
+loyalty member in Puntos+. Rules 5 and 6 add obligations when the data is
+financial, sensitive, about minors, or entered by someone other than the
+person it describes.
+
+### 1. One file says what personal data the app holds — `privacy/data-inventory.json`
+
+The notice is written *from* this file, and CI keeps the file equal to the
+schema. One entry per entity that holds personal data:
+
+```json
+{
+  "notice_version": "2026-10-07",
+  "entities": {
+    "Client": {
+      "titular": "tenant_customer",
+      "acacia_role": "encargado",
+      "fields": {
+        "name":  { "category": "identification" },
+        "phone": { "category": "contact" },
+        "rfc":   { "category": "fiscal" }
+      },
+      "purposes": [
+        { "id": "fulfil_orders", "requires_consent": false },
+        { "id": "marketing_whatsapp", "requires_consent": true }
+      ],
+      "source": "entered_by_tenant",
+      "recipients": ["base44", "mission-control-bodega", "meta-whatsapp"],
+      "retention": "while the tenant is active; fiscal fields for as long as tax law requires",
+      "deletion": "anonymize name/phone/rfc, keep the transaction rows"
+    }
+  },
+  "no_personal_data": ["Product", "Warehouse"]
+}
+```
+
+- `category`: `identification` | `contact` | `fiscal` | `financial` |
+  `location` | `sensitive` | `minor` | `credentials`. `financial` and
+  `sensitive` trigger rule 5.
+- `titular`: whose data it is (`account_user`, `tenant_customer`,
+  `tenant_employee`, `visitor`, `lead`, …).
+- `acacia_role`: `responsable` or `encargado` (rule 2).
+- A purpose that scores, profiles or decides about a person with no human in
+  the loop carries `"automated_decision": true`. The titular can oppose that
+  treatment (art. 26 II), so the app needs a way to switch it off per person.
+- `recipients`: every system the field reaches. **Mission Control's bodega is a
+  recipient** (Module 0 keeps a copy of operational data there), and so is any
+  LLM provider a feature sends the field to.
+- Every entity in the schema appears either under `entities` or in
+  `no_personal_data`. An entity in neither fails CI. That is the whole guard:
+  a new entity cannot ship without someone deciding whether it holds personal
+  data.
+
+### 2. Decide who is the *responsable* for each category, before writing a word
+
+Two different relationships live in every multi-tenant app, and one notice
+cannot cover both:
+
+| data | responsable | ACACIA is | document |
+|---|---|---|---|
+| the account holder's own data, billing contact, leads, support tickets | ACACIA | responsable | the app's privacy notice (rule 3) |
+| what a tenant loads about *its* customers, employees, suppliers, visitors | the tenant | encargada — treats it on the tenant's behalf (art. 2 XII) | a data-processing clause in the tenant terms, plus a place for the tenant to publish its own notice |
+
+The data-processing clause commits ACACIA to treat the data only on the
+tenant's instructions, keep it confidential after the relationship ends
+(art. 20), apply the security measures of rule 8, name its sub-processors,
+help the tenant answer ARCO requests, and return or delete the data when the
+tenant leaves (Module 7's *delete tenant*). The app gives the tenant somewhere
+to put its own notice in front of its own titulares: the public order page,
+the loyalty sign-up, the visitor pass. A tenant that collects data through an
+ACACIA app with no notice of its own is exposed, and the app made that easy.
+
+A communication to an encargado is not a *transferencia* under art. 2 XX. The
+2025 law does not use the word "remisión"; the 2011 Reglamento does, so if the
+lawyer writes it, that is why.
+
+### 3. The notice, in two forms, at a fixed address
+
+- **Integral** — one page per app at `acaciaco-site/legal/privacidad/<slug>`
+  (the slug is the Mission Control id, Module 17). It contains the six items of
+  art. 15: (I) identity **and full address** of the responsable; (II) the data
+  treated, generated from the inventory, marking any sensitive data; (III) the
+  purposes, **separating those that need consent** from those that do not;
+  (IV) the options to limit use or disclosure; (V) how to exercise ARCO rights;
+  (VI) how changes are communicated. Plus what art. 7 and art. 35 require
+  inside the notice: how to **revoke** consent, and a clause to accept or
+  refuse any transfer to a third party that is not an encargado (that third
+  party receives the notice and takes on the responsable's obligations). Plus, because
+  it is cheap and it is what a reader looks for: the named sub-processors, the
+  retention periods, a "what this app does not collect" line, and the date and
+  version.
+- **Simplificado** — at *every* point of electronic collection (signup, contact
+  form, support form, public order or pass page): items I–IV in a few lines and
+  a link to the integral page (art. 16 II). A footer link alone is not this.
+- Linked from the login page (Module 10), signup, the About screen
+  (Module 21), and the app's `apps/` page (Module 9).
+- Cite the law by name and DOF date. **Do not cite article numbers in the
+  public notice** unless the lawyer who reviewed it put them there: article
+  numbers copied from the abrogated law are how the notice that prompted this
+  module dated itself.
+- Complaints go to the Secretaría Anticorrupción y Buen Gobierno. Not the
+  INAI, not the SNT.
+
+[`shared/privacy/`](shared/privacy/) has the skeleton for both forms and an
+inventory example.
+
+### 4. Consent is recorded, by notice version
+
+Tacit consent is valid for ordinary data once the notice has been made
+available (art. 7). The app still records *that* it was made available: a
+`ConsentRecord` (user, `notice_version`, timestamp, purposes accepted) written
+at signup by a backend function. When `notice_version` changes in a way that
+adds a purpose, a recipient or a data category, the user sees the change on
+next login and the record is rewritten. Purposes with `requires_consent: true`
+(marketing, anything not needed to deliver the service) are separate,
+unticked, and refusing them never blocks the service.
+
+### 5. Financial, sensitive and minors' data
+
+- **Financial or patrimonial data** needs *express* consent (art. 7): an
+  explicit, recorded action, not a notice in the footer. Art. 7 excepts the
+  cases of arts. 9 and 36; whether a subscriber's own billing data falls under
+  art. 9 is the lawyer's call, and the recorded action stays the portfolio
+  default either way. A card number never
+  touches an ACACIA backend; the processor's hosted field takes it.
+- **Sensitive data** (art. 2 VI, a list that says it is not exhaustive: racial
+  or ethnic origin, present or future health, genetic information, religious,
+  philosophical and moral beliefs, political opinions, sexual preference)
+  needs express **written** consent through a signature or an
+  authentication mechanism (art. 8), and a database of it must be justified by
+  a concrete purpose. The portfolio default is **do not collect it**. An app
+  that must says so here, by name, with the purpose. Biometric data is not in
+  the law's list; treating it as sensitive is this portfolio's choice.
+- **Minors** (any app aimed at children or families): the adult responsible
+  consents, and the inventory marks the field `minor`. That is portfolio
+  policy: the 2025 law says nothing about minors beyond letting a legal
+  representative act for the titular (art. 21). Ask the lawyer.
+- **Photographs of official ID, plates, faces, voice**: treat as high risk.
+  Off by default, behind a tenant setting, with a retention period.
+
+### 6. ARCO and revocation have a path that someone answers
+
+"Send an email" is a mailbox, not a procedure. The law requires a designated
+person or data-protection department that processes these requests (art. 29):
+name it in the notice and in the app's `CLAUDE.md`. The path:
+
+- In the app, under Account (Module 7): **Acceso** is the data export,
+  **Rectificación** is the profile edit, **Cancelación** is the deletion
+  request, **Oposición** and revocation are the consent toggles of rule 4.
+- Anything those do not cover, and every request from someone who is not a
+  user (a tenant's customer, a visitor), is a **Module 8 ticket of category
+  `arco`**. It gets an acknowledgement with a folio at once and a due date.
+  The law gives twenty days to answer and fifteen more to make it effective,
+  each extendable once (art. 31), and art. 2 VIII defines *días* as business
+  days. Compute the due date in **calendar** days anyway: it is always the
+  earlier date, and the law does not say which days count as business days.
+  The category does not exist yet — adding it is a Mission Control change
+  (`ticketControl.js`, Module 17), not only an app change.
+- A request is closed by telling the person what was done, through the channel
+  they used; a refusal states its reason (art. 33). After a cancellation or a
+  rectification, every recipient in the inventory that still holds the data is
+  told to do the same (art. 24).
+- When ACACIA is the encargada, the request belongs to the tenant: the ticket
+  is routed to the tenant's admin, and ACACIA executes what the tenant decides.
+- Identity is verified before any data is released (art. 28 II, art. 31).
+
+### 7. Retention and deletion — and the rule about never deleting history
+
+Data that is no longer needed for its purpose is blocked and then deleted
+(art. 10). This collides with a portfolio principle (StockFlow: *adjust,
+never delete history*). The resolution is the same in every app: **keep the
+transaction, remove the person.** Deleting a customer anonymizes the personal
+fields on the record and on the rows that reference it; the movement, the
+invoice number and the amounts stay. What must be kept by another law (fiscal
+records) is named in the notice with its period. The deletion reaches every
+recipient in the inventory, **including the copy in Mission Control's bodega**
+— a row deleted in the app and still readable in the bodega is not deleted.
+Data about a contractual default is deleted after 72 months (art. 10).
+
+### 8. Security claims are ones you can prove
+
+Art. 18 requires administrative, technical and physical measures. Modules 4,
+14, 16, 19 and 20 are those measures; the notice may say so. What the notice
+and the site may **not** say is anything nobody can demonstrate: "end-to-end
+encryption" for data the server reads, "guaranteed" availability with no SLA
+behind it, or a certification that belongs to someone else. SOC 2 Type II and
+ISO 27001 are **Base44's** certificates. The site says that correctly today;
+keep the attribution on the same line as the badge, everywhere it appears.
+"Cumplimos con la LFPDPPP" is a claim, and this module's gate is what backs
+it.
+
+### 9. A breach has a runbook before there is a breach
+
+A security incident that significantly affects the titulares' "derechos
+patrimoniales o morales" is reported to them **immediately** (art. 19). Each app's `CLAUDE.md` names who decides
+that, the template message, and where the record goes
+(`docs/incidents.md`, same format as every other incident). When ACACIA is
+the encargada, the tenant is told first and at once, because the duty to tell
+the titulares is the tenant's.
+
+**Review cadence.** Each notice is re-read when the inventory changes, when a
+recipient is added, and once a year against the law and the Reglamento. The
+date goes on the `Privacy notice last checked` line in `CHECKLIST.md`.
+
+**Reference implementation.** None. `shared/privacy/` holds templates, not a
+checker. Until an app ships the inventory check, this module is a contract
+without a copyable script. Say so in audits instead of marking it done.
+
+**Not yet audited across the portfolio (2026-10-07):** no app has a
+`privacy/data-inventory.json`, a per-app notice, a `ConsentRecord`, an `arco`
+ticket category or a data-processing clause. `acaciaco-site/legal/privacidad`
+has the gaps listed at the top of this module. Every app goes red on this
+module until it adds them.
+
+---
+
 ## Verification gates — what actually proves a module is live
 
 The recurring failure across this portfolio is not writing the code. It is
@@ -1683,6 +1943,7 @@ Each module's proof is a thing you can run and read.
 | 24 tenant roles | no tenant role reaches every tenant | only platform accounts hold built-in `admin` in live `User`; `check-tenant-roles.mjs` green in CI; deployed schema matches the checked files |
 | 25 signup finishes | a new email+password user can activate their account | `grep -rn verifyOtp src/` reachable from Register **and** Login, `resendOtp` called; then live with a throwaway `+` address: register, skip the code, log in — the code field appears, the code lands you in the app |
 | 26 function metadata | every function says what it is for, and nothing is deployed that nothing calls | `npm run lint` green with the metadata check; `base44 functions list` equals the directories with `function.meta.json`; every `cron:` trigger matches an **active** workflow in `GET /api/apps/{id}/workflows` |
+| 27 personal data | the notice describes the deployed app, and a request reaches a person | the inventory check green in CI against the **deployed** schema (`list_entity_schemas`), not the repo file; every field named in the published notice exists in the inventory and the reverse; raise an `arco` ticket from a throwaway account and read the folio and due date back in Mission Control; delete a test customer and confirm the personal fields are gone from the app **and** from the bodega; the PR that published the notice names the lawyer who reviewed it |
 
 ---
 
@@ -1752,7 +2013,12 @@ Each module's proof is a thing you can run and read.
     throwaway address before the first customer signs up.
 22. Give every backend function a `function.meta.json` from the first commit
     (Module 26), and wire the metadata check into `npm run lint`.
-23. Copy `CHECKLIST.md` from this repo into the new app's `CLAUDE.md`.
+23. Write `privacy/data-inventory.json` with the first entity that holds a
+    person's data (Module 27), decide for each category whether ACACIA is the
+    responsable or the encargada, and publish the notice (integral on
+    `acaciaco-site`, simplificado at every form) **before the first real
+    person's data is stored** — reviewed by a lawyer, not after launch.
+24. Copy `CHECKLIST.md` from this repo into the new app's `CLAUDE.md`.
 
 See [`CHECKLIST.md`](CHECKLIST.md) for the compact, copy-pasteable version of
 this list, and [`docs/incidents.md`](docs/incidents.md) for the full postmortems

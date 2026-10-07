@@ -1,0 +1,41 @@
+{
+  "notice_version": "2026-10-07",
+  "entities": {
+    "User": {
+      "titular": "account_user",
+      "acacia_role": "responsable",
+      "fields": {
+        "full_name": { "category": "identification" },
+        "email": { "category": "contact" },
+        "phone": { "category": "contact" }
+      },
+      "purposes": [
+        { "id": "provide_service", "requires_consent": false },
+        { "id": "billing", "requires_consent": false },
+        { "id": "product_news", "requires_consent": true }
+      ],
+      "source": "entered_by_titular",
+      "recipients": ["base44", "mission-control-bodega", "mercado-pago"],
+      "retention": "while the account exists",
+      "deletion": "Module 7 delete account"
+    },
+    "Client": {
+      "titular": "tenant_customer",
+      "acacia_role": "encargado",
+      "fields": {
+        "name": { "category": "identification" },
+        "phone": { "category": "contact" },
+        "rfc": { "category": "fiscal" }
+      },
+      "purposes": [
+        { "id": "fulfil_orders", "requires_consent": false },
+        { "id": "marketing_whatsapp", "requires_consent": true }
+      ],
+      "source": "entered_by_tenant",
+      "recipients": ["base44", "mission-control-bodega", "meta-whatsapp"],
+      "retention": "while the tenant is active; fiscal fields for as long as tax law requires",
+      "deletion": "anonymize name/phone/rfc, keep the transaction rows"
+    }
+  },
+  "no_personal_data": ["Product", "Warehouse"]
+}

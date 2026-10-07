@@ -627,3 +627,26 @@ anything reaches it.
 **What changed.** Module 26: a `function.meta.json` per function, CI that checks
 declared callers and triggers against the code and the workflows, and a
 deletion rule that needs 7 days of *captured* logs, not today's window.
+
+## Portfolio — a privacy notice nobody could check against the app (2026-10-07)
+
+**What happened.** Reading a competitor's privacy notice as a possible model
+showed a document that cited articles of the 2010 data-protection law
+(abrogated 2025-03-20), sent complaints to the wrong authority, and described
+a QR reader while its own home page sold payments, finances and visitor
+registries. Reading ACACIA's own notice the same day showed different gaps:
+four of eleven apps named, a city instead of an address, no purposes marked as
+needing consent, no way to limit use or revoke consent, and nothing about the
+data tenants load into the apps about their own customers. No app repo records
+what personal data it stores.
+
+**Why it went unnoticed.** A privacy notice is prose on a marketing site, in a
+different repo from every app. Adding an entity with a phone number changes
+nothing there, and no check connects the two. The notice was last edited
+2026-04-28; the apps have changed many times since.
+
+**What changed.** Module 27: a `privacy/data-inventory.json` per app that CI
+keeps equal to the schema, the notice written from it, ACACIA's role decided
+per data category, an ARCO path through Module 8, and deletion that reaches
+Mission Control's bodega. Nothing was fixed in any app or on the site by this
+entry; every app is red on Module 27 until it does the work.

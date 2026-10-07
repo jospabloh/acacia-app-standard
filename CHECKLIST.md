@@ -254,7 +254,9 @@ jospabloh/acacia-app-standard. Status:
       person or department handles ARCO; requests are `arco` tickets with
       folio and due date, open to people with no account. Deleting a person
       anonymizes the personal fields, keeps the transaction, and leaves a
-      record of what was done in every place the data was kept. No security
+      record of what was done in every place the data was kept; every
+      retention period has a scheduled job that enforces it. A person can
+      object to an automated decision and the function stops applying it. No security
       or compliance claim nobody can prove.
 
 Last audited against the standard: <date> — <what changed / what's still open>

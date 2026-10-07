@@ -231,9 +231,40 @@ jospabloh/acacia-app-standard. Status:
       colour unchanged. `celebrate()` only after a successful write that
       finishes something. Verified with screenshots in both themes at
       320/390/834/1440 on the deployed bundle. Guideline: STANDARD.md §27.
+- [ ] Module 28 — Personal data: applies to any app that handles a
+      person's data, stored or only passed on (the account email counts). ONE notice for the whole portfolio lives at
+      acaciaco.com.mx/legal/privacidad; this app links to it from login,
+      signup and About, never copies its text, and shows a simplified notice
+      at every form a person fills in themselves. `privacy/data-inventory.json`
+      marks EVERY deployed field personal or not and records, for what is
+      personal: kind, whose (and whether minors), ACACIA's role, uses and
+      which need consent, and every place it goes or is kept (the bodega,
+      providers, files, logs, sessions, browser) with retention and deletion
+      there. CI fails on an unclassified field, on the PR against the repo's
+      entity files and again against the deployed schema. This app's section
+      of the notice says everything the inventory says, and the notice is
+      updated BEFORE an app change that alters it ships. ACACIA is
+      responsable (account, billing, leads, support) or encargada (what a
+      tenant loads about its own people); the second needs a data-processing
+      clause, and no public form of a tenant is published without that
+      tenant's notice. Optional uses and third-party transfers have their own
+      unticked box; the choice is recorded per person and OBEYED by the
+      function behind that use. Express consent for financial data;
+      sensitive data only from an authenticated person, and not by default.
+      People whose data the tenant's staff entered get the notice. A named
+      person or department handles ARCO; requests are `arco` tickets with
+      folio and due date, open to people with no account. Deleting a person
+      anonymizes the personal fields, keeps the transaction, and leaves a
+      record of what was done in every place the data was kept; every
+      retention period has a scheduled job that enforces it. A person can
+      object to an automated decision and the function stops applying it. No security
+      or compliance claim nobody can prove. This file names who decides a
+      breach must be reported, the message to send and where the record
+      goes.
 
 Last audited against the standard: <date> — <what changed / what's still open>
 Last multi-tenant isolation audit: <date> — <scope, findings, what's unverified>
 Secrets last read back: <date> — <which ones, and how each was proven>
 Security locks last checked for drift (Module 19): <date> — <deployed vs. repo, any found open>
+Privacy last checked (Module 28): <date> — <inventory vs. deployed schema, this app's section of the notice, who reviewed>
 ```

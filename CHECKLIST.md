@@ -266,11 +266,19 @@ jospabloh/acacia-app-standard. Status:
       object to an automated decision and the function stops applying it. No security
       or compliance claim nobody can prove. This file names who decides a
       breach must be reported, the message to send and where the record
-      goes.
+      goes. The tenant's admin accepts the terms (which carry the
+      data-processing conditions) once per version: the backend reads the
+      version from acaciaco.com.mx/legal/version.json, records who, when,
+      which version and its hash in rows that are only added, refuses to
+      create a tenant without it, gives existing tenants the grace period,
+      then makes an undecided or rejecting tenant read-only server-side.
+      Rejecting asks twice and raises a ticket; nothing is deleted by a
+      timer. Ships observing; the date enforcement was turned on is below.
 
 Last audited against the standard: <date> — <what changed / what's still open>
 Last multi-tenant isolation audit: <date> — <scope, findings, what's unverified>
 Secrets last read back: <date> — <which ones, and how each was proven>
 Security locks last checked for drift (Module 19): <date> — <deployed vs. repo, any found open>
 Privacy last checked (Module 28): <date> — <inventory vs. deployed schema, this app's section of the notice, who reviewed>
+Terms acceptance (Module 28, rule 10): <observing since date | enforced since date> — <tenants decided / total when it was turned on>
 ```

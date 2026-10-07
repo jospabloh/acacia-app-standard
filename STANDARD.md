@@ -2100,6 +2100,120 @@ record goes (`docs/incidents.md`, same format as every other incident). When
 ACACIA is the encargada, the tenant is told first and at once, because the
 duty to tell the titulares is the tenant's.
 
+### 10. A tenant's admin accepts the terms once per version, and the app can show it
+
+Rule 3 puts a data-processing clause in the tenant terms. A clause nobody
+agreed to binds nobody: on 2026-10-07 no app recorded that any tenant had
+accepted anything, and the terms page named four of eleven apps.
+
+**What is accepted, and what is not.** The tenant's admin accepts the
+**terms** (`acaciaco.com.mx/legal/terminos`), which carry the data-processing
+conditions; the same screen links to the privacy notice. Nobody "accepts" a
+privacy notice: the law asks that it be made available, and consent to it is
+tacit (rule 4). The tick is an organisation agreeing to a contract, and the
+person ticking declares they may bind it. It replaces none of rule 4's
+consents: those belong to the people the data is about, and the tenant's
+admin cannot give them.
+
+**The version comes from one place.**
+`https://acaciaco.com.mx/legal/version.json`, kept in `acaciaco-site` next to
+the text: `version`, `published`, `grace_days`, the SHA-256 of the terms as
+served, and `changes_es` — the lines an app shows before asking again, which
+the terms page prints too. A test in that repo fails when the terms change
+and the manifest does not. A person bumps the version, for a change of
+substance; fixing a typo changes the hash and not the version, so nobody is
+asked again over a comma. Two texts can therefore share a version, and the
+hash is what tells them apart: the text behind a stored hash is that repo's
+terms page at the commit where `legal/version.json` first carried it
+(`git log -S <hash> -- legal/version.json`). A tag per version is a
+convenience, not the record.
+
+**The backend reads the manifest. The client never tells the server which
+version is current.** A decision is recorded against a manifest read at that
+moment, so the row carries the version and hash being served when the admin
+decided. When the manifest cannot be read, nothing is recorded: the admin is
+told to try again in a few minutes and is let through meanwhile, whatever
+the grace period says, and creating a tenant fails the same way and leaves
+nothing behind. For everyone else an unreachable manifest changes nothing:
+it never starts a grace period, and decisions already recorded stand. The backend keeps the last manifest it
+read only to know, between reads, whether there is a version to ask about.
+
+- **A tenant admin decides, once per version unless they change their
+  mind** — the tenant's highest role (Module 24). Not a staff account, and
+  not the platform's `admin` on the tenant's behalf. A version can have more
+  than one decision for the same tenant: a rejection undone by an
+  acceptance, or two admins deciding. Nothing makes tenant-and-version
+  unique; the latest row is the tenant's state, and the screen says who
+  decided last and when.
+- **Recorded by a backend function, in rows that are only ever added**:
+  tenant, version, the terms' hash, `accepted` or `rejected`, server time,
+  and who — user id, name and email as stored, not as sent. A later decision
+  is a new row; no row is deleted or rewritten, and the client can write
+  none of them. The name and email are evidence of a contract and are kept
+  while the tenant exists and for the period the inventory states after it
+  closes; then rule 7 reaches them as it reaches any record — the person is
+  removed and the decision stays, with its version, hash and time. The
+  tenant record carries the current state (version, decision, when) for the
+  gate to read, locked like `billing_status` (Module 19). The row is written
+  first and is the truth: where the tenant record disagrees with the latest
+  row, the row wins and the function repairs the record the next time it
+  runs. The tenant's admins see the rows under Account. They are personal data of
+  those admins and are in the inventory (rule 2).
+- **The terms open in a new tab from a link.** `acaciaco-site` forbids
+  framing (`frame-ancestors 'self'`), so an iframe of the page is blank.
+- **A new tenant accepts as it is created**: the acceptance is part of the
+  function that creates the tenant (Module 1), and the two stand or fall
+  together. If the acceptance cannot be written the tenant is not left
+  behind — the function undoes what it created, the same care Module 18
+  asks for with a half-made tenant.
+- **An existing tenant's admin gets `grace_days`, counted from the first time
+  the app asks them** — a date the backend records for that tenant and
+  version, not the version's `published` date. These are calendar days and an outage
+  does not pause them. During it the admin is asked at each login, sees what
+  changed, and can postpone. After it the admin has
+  to accept or reject to get past that screen.
+- **Nobody else is ever stopped by this.** Staff keep working whatever the
+  admin did or did not do, and a tenant whose admin never logs in is never
+  restricted: it stays on the terms it had. This rule adds no second
+  read-only state next to `billing_status`. That is a deliberate limit of
+  the first version — a tenant can run undecided for as long as its admin
+  stays away — and the count of undecided tenants is what tells a person at
+  ACACIA to pick up the phone.
+- **Rejecting asks twice.** The second screen says what will happen, in the
+  terms' own words: the account keeps working until the end of the period
+  already paid or of the trial, the renewal is cancelled, the service is
+  then suspended, thirty days from then to ask for the data, after which the
+  account is closed and its data deleted — and that accepting before the
+  closure undoes the rejection. Going back is the default button.
+- **A rejection is a cancellation, and the licence lifecycle carries it
+  out.** A confirmed rejection **raises a ticket** (Module 8) and is then
+  recorded, in that order: if the ticket cannot be written nothing is
+  recorded and the admin retries, so no rejection exists that nobody at
+  ACACIA heard of. A person there calls the client and cancels the renewal,
+  after reading the tenant's state as it is then — two admins can decide in
+  the same minute, and the latest row, not the ticket, is the decision.
+  Mission Control then moves `billing_status` at the end of the period as it
+  does for any cancellation (Module 1). The app itself restricts nothing on
+  a rejection. Closing the account (Module 7) is decided by a person, never
+  by a timer counting from the rejection; once it is closed its data is
+  deleted on rule 7's schedule like any closed tenant's, and the ticket
+  stays open until the tenant has been told by email that it was done. An
+  acceptance that follows a rejection raises a second ticket the same way,
+  so that the person undoes what they did. **Deciding is the one write a
+  `view_only` or `suspended` tenant is still allowed** (Module 3 refuses
+  every other): the terms promise that accepting before the closure undoes
+  the rejection, and by then the lifecycle has already suspended the
+  account.
+- **It ships observing.** With enforcement off the gate asks, records, and
+  always lets the admin postpone. Enforcement — the end of postponing — is
+  turned on per app, on a date written in the app's `CLAUDE.md`, and never
+  applies to a tenant the app has not yet asked.
+- **Where ACACIA is the responsable** (FlowFin, ArtisKids) the account
+  holder goes through the same screen and leaves the same record. In
+  FlowFin, where the whole account is financial data, that screen also
+  carries rule 4's express consent as a box of its own; everywhere else that
+  box stays at the form that asks for the data.
+
 **What this module cannot prove.** Say these in an audit instead of marking
 it green:
 
@@ -2123,7 +2237,7 @@ least once a year against the law and the Reglamento. The date goes on the
 `Privacy last checked` line in `CHECKLIST.md`.
 
 **Reference implementation.** None. No app has an inventory, a consent
-record, or the one CI check. Until one does, this module is a contract
+record, a tenant's acceptance (rule 10), or the one CI check. Until one does, this module is a contract
 without a copyable script. Say so in audits instead of marking it done.
 
 **Not yet audited across the portfolio (2026-10-07).** Beyond the table in
@@ -2166,7 +2280,7 @@ Each module's proof is a thing you can run and read.
 | 25 signup finishes | a new email+password user can activate their account | `grep -rn verifyOtp src/` reachable from Register **and** Login, `resendOtp` called; then live with a throwaway `+` address: register, skip the code, log in — the code field appears, the code lands you in the app |
 | 26 function metadata | every function says what it is for, and nothing is deployed that nothing calls | `npm run lint` green with the metadata check; `base44 functions list` equals the directories with `function.meta.json`; every `cron:` trigger matches an **active** workflow in `GET /api/apps/{id}/workflows` |
 | 27 `mario_style` (optional) | if adopted: the app has the style and celebrates only finishing | `src/styles/mario_style.css` and `src/lib/celebrate.js` byte-identical to `shared/mario_style/` (`cmp`); every `celebrate(` call sits after an awaited write, outside `catch`; layout scanner **and** screenshots clean at 320/390/834/1440 in light and dark on the **deployed** bundle. N/A for apps that did not adopt it |
-| 28 personal data | one notice describes every deployed app, consent is obeyed, and a request reaches a person | `acaciaco.com.mx/legal/privacidad` is served with a full address, the six items of art. 15 and a section for this app, and the PR that last changed it names the lawyer who read it; the app links to it from login, signup and About, and **every** form a person fills in themselves shows the simplified notice with its five parts, naming as sensitive any sensitive data that form asks for; the inventory check is green on the PR against the repo's entity files and green again against the **deployed** schema (`list_entity_schemas`) after the entities were deployed; read the app's section of the served notice against the inventory line by line — every kind of data, every kind of person, everything sensitive or about minors, **every use**, the ones that need no consent as much as the ones that do, every automated decision, every recipient, every retention period — and find nothing in one that is missing from the other; read the inventory's data outside entities against the running app (what sign-in holds, a session, a function log, an upload, the browser's storage, each provider's copy of a message) and find nothing there that the file omits; for **every** use that needs consent, decline it as one person and accept then revoke it as another, and confirm the function behind that use does nothing for either while it still acts for someone who accepted; at **every** form that asks for financial or sensitive data, withhold the express consent and confirm the form is refused and nothing is stored — and where a processor's hosted card field is involved, that the field is not in the page and no request has gone to the processor until the consent is recorded — then give it, revoke it, and confirm the function that used that data stops; where the data is sensitive, try to give that consent signed out and without the confirmed code or signature and confirm it is refused; where the person may be a minor, try the flow as the minor with no responsible adult and confirm it is refused; change how the notice describes one optional use and one third-party transfer that two test people had accepted, one with an account and one without, and confirm the first is shown the change at next login, the second is asked at their next form, neither use is acted on for either until answered again, and their other choices stand; raise an `arco` request from an account and another with no account, and read back for each its folio, its date to answer by and who it reached, then answer one in the person's favour and read back the separate date to act by; with no account, send an access, a rectification, a cancellation and an objection each twice, once with a valid identity document and once with someone else's, and confirm the first of each pair is carried out and the second releases nothing and changes nothing; read what the access request returned against the inventory and find every datum the app holds about that person, from every place it is kept, the bodega and the providers included; for **every** way the tenant's staff can enter people's data, a form or an import, run it and find either the tenant's statement that those people have its notice, recorded on that entry, or the notice sent to each of them and logged, and where a person has no usable contact confirm the tenant is told who received nothing; where such an entry carries financial or sensitive data, submit it without the tenant's statement about consent and confirm it is refused, then with it and find the statement stored; for **every** kind of person the app holds, carry one deletion and one rectification through and read back the record of what was done in each place the inventory lists, the bodega included; for **every** automated decision the app makes about people, record one person's objection and confirm the function stops applying it to them and still applies it to others; confirm **every** kind of data in the inventory has a retention period tied to an event, none open-ended, then for each period seed data older than it, run what enforces it, and read back the same record for each place that data was kept; for a multi-tenant app, take a tenant and blank its name, then its address, then its privacy contact, and find **every** one of its public forms unpublished each time; with all three filled, read the simplified notice each form serves and find the tenant named as responsable with that address, and follow its link to an integral notice that loads; and read the tenant terms as deployed and find each commitment of rule 3's data-processing clause: instructions only, confidentiality, security, providers named, help with ARCO, return or deletion on exit; open the app's `CLAUDE.md` and find the breach runbook of rule 9 complete: who decides, the message to send, where the record goes, and for a multi-tenant app that the tenant is told first |
+| 28 personal data | one notice describes every deployed app, consent is obeyed, and a request reaches a person | `acaciaco.com.mx/legal/privacidad` is served with a full address, the six items of art. 15 and a section for this app, and the PR that last changed it names the lawyer who read it; the app links to it from login, signup and About, and **every** form a person fills in themselves shows the simplified notice with its five parts, naming as sensitive any sensitive data that form asks for; the inventory check is green on the PR against the repo's entity files and green again against the **deployed** schema (`list_entity_schemas`) after the entities were deployed; read the app's section of the served notice against the inventory line by line — every kind of data, every kind of person, everything sensitive or about minors, **every use**, the ones that need no consent as much as the ones that do, every automated decision, every recipient, every retention period — and find nothing in one that is missing from the other; read the inventory's data outside entities against the running app (what sign-in holds, a session, a function log, an upload, the browser's storage, each provider's copy of a message) and find nothing there that the file omits; for **every** use that needs consent, decline it as one person and accept then revoke it as another, and confirm the function behind that use does nothing for either while it still acts for someone who accepted; at **every** form that asks for financial or sensitive data, withhold the express consent and confirm the form is refused and nothing is stored — and where a processor's hosted card field is involved, that the field is not in the page and no request has gone to the processor until the consent is recorded — then give it, revoke it, and confirm the function that used that data stops; where the data is sensitive, try to give that consent signed out and without the confirmed code or signature and confirm it is refused; where the person may be a minor, try the flow as the minor with no responsible adult and confirm it is refused; change how the notice describes one optional use and one third-party transfer that two test people had accepted, one with an account and one without, and confirm the first is shown the change at next login, the second is asked at their next form, neither use is acted on for either until answered again, and their other choices stand; raise an `arco` request from an account and another with no account, and read back for each its folio, its date to answer by and who it reached, then answer one in the person's favour and read back the separate date to act by; with no account, send an access, a rectification, a cancellation and an objection each twice, once with a valid identity document and once with someone else's, and confirm the first of each pair is carried out and the second releases nothing and changes nothing; read what the access request returned against the inventory and find every datum the app holds about that person, from every place it is kept, the bodega and the providers included; for **every** way the tenant's staff can enter people's data, a form or an import, run it and find either the tenant's statement that those people have its notice, recorded on that entry, or the notice sent to each of them and logged, and where a person has no usable contact confirm the tenant is told who received nothing; where such an entry carries financial or sensitive data, submit it without the tenant's statement about consent and confirm it is refused, then with it and find the statement stored; for **every** kind of person the app holds, carry one deletion and one rectification through and read back the record of what was done in each place the inventory lists, the bodega included; for **every** automated decision the app makes about people, record one person's objection and confirm the function stops applying it to them and still applies it to others; confirm **every** kind of data in the inventory has a retention period tied to an event, none open-ended, then for each period seed data older than it, run what enforces it, and read back the same record for each place that data was kept; for a multi-tenant app, take a tenant and blank its name, then its address, then its privacy contact, and find **every** one of its public forms unpublished each time; with all three filled, read the simplified notice each form serves and find the tenant named as responsable with that address, and follow its link to an integral notice that loads; and read the tenant terms as deployed and find each commitment of rule 3's data-processing clause: instructions only, confidentiality, security, providers named, help with ARCO, return or deletion on exit; open the app's `CLAUDE.md` and find the breach runbook of rule 9 complete: who decides, the message to send, where the record goes, and for a multi-tenant app that the tenant is told first; and for rule 10: try to create a tenant without accepting and get a refusal; call the deciding function as a staff user of a tenant and get a refusal, and again as the platform's `admin` naming that tenant and get a refusal; accept as a tenant admin and read back the row — version and hash equal to the served `legal/version.json`, who, server time — and the tenant's current state; try to write, update and delete such a row from the client and get three refusals; point the app at a manifest with a newer version and confirm the admin is asked again with `changes_es` shown, that the date of that first asking is recorded, that the earlier row is untouched, and that a staff user of the same tenant sees nothing and can still write; with enforcement on, move that date back past the grace period and confirm the admin cannot postpone while staff still write, then confirm a tenant with no such date is not held at all; reject, confirm on the second screen, and find the row, the ticket in Mission Control, and the tenant still working; accept afterwards and find both rows and a second ticket; reject again, set the tenant to `suspended`, and confirm accepting still works there while every other write is refused; make the acceptance write fail while a tenant is being created and find no tenant left behind; make the manifest unreachable and confirm nothing changes for a tenant that had decided or one that had not, that a decision attempted then is not recorded and the admin is told to retry and is let through even with the grace period over, and that creating a tenant fails the same way and leaves nothing behind |
 
 ---
 

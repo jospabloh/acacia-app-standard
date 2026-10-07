@@ -59,7 +59,9 @@ store), `purposes` (ids, each one a purpose of what it collects), `notice`
 
 A simplified notice and a `ConsentRecord` exist where `filled_by` is
 `titular` or `representative`. A point filled in by staff or by a system
-serves no optional purpose.
+serves no optional purpose. A point that collects a `sensitive` field has
+`"authenticated": true` (a signed-in user, a confirmed code, or a signature);
+a `public_form` without it that collects one is an error.
 
 ## `stores.<key>`
 

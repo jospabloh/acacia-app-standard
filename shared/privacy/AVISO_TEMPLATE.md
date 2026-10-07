@@ -152,13 +152,24 @@ y domicilio.*
 > promociones por WhatsApp".]
 > ☐ [Una por cada transferencia a un tercero que requiera aceptación: "Acepto
 > que compartan mi nombre con Aseguradora X para cotizarme un seguro".]
-> ☐ [Si el formulario pide datos financieros o sensibles: "Autorizo el
-> tratamiento de [esos datos] para [finalidad necesaria]".]
+> ☐ [Si el formulario pide datos financieros: "Autorizo el tratamiento de
+> [esos datos] para [finalidad necesaria]".]
+> [Si pide datos sensibles: no basta una casilla. "Autorizo el tratamiento
+> de [esos datos] para [finalidad necesaria]", seguido de la firma o del paso
+> de autenticación.]
 
 Las casillas no se escriben a mano: salen del inventario. Ninguna viene
-marcada. Las dos primeras son opcionales y no condicionan el servicio. La
-tercera es obligatoria para enviar el formulario que pide esos datos. Cada
-respuesta, aceptada o rechazada, queda en el `ConsentRecord`.
+marcada. Las dos primeras son opcionales y no condicionan el servicio. La de
+datos financieros es obligatoria: sin ella el formulario no se envía y no se
+guarda nada. Cada respuesta, aceptada o rechazada, queda en el
+`ConsentRecord`.
+
+**Datos sensibles.** La ley pide consentimiento expreso y por escrito,
+mediante firma o un mecanismo de autenticación. Por eso solo los recaba un
+formulario cuyo titular o representante está autenticado (sesión iniciada, o
+un código confirmado en su propio teléfono o correo) o que recoge su firma, y
+el `ConsentRecord` guarda cuál de los dos se usó. Un formulario público
+anónimo no pide datos sensibles.
 
 ---
 

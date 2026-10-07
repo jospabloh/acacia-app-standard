@@ -14,6 +14,10 @@
 // Wire this behind the SAME fail-closed cron guard every other scheduled
 // endpoint in this app already uses (Module 16) — an unset CRON_SECRET must
 // mean 503, never "ran anyway."
+//
+// KNOWN DEFECT on Base44: a scheduled automation calls the function with no
+// headers, so requireCron answers 401 to every run and nothing is reaped.
+// See shared/session/README.md, "Layer 3", before copying this shape.
 
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.23';
 import { requireCron } from '../_internalGuard.ts'; // this app's own fail-closed cron guard

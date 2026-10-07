@@ -24,12 +24,12 @@ the end, on purpose: do not close one by guessing.
 |---|---|
 | `notice_version` | an integer, incremented by hand when CI says the notice text changed |
 | `notice_hash` | hash of the generator's whole output (every notice, integral and simplified); CI recomputes it and fails if it differs, or if it differs from `main` while `notice_version` does not |
-| `platform_fields` | fields the platform adds to every entity, classified once; `created_by` is a `ref` to the user's email |
+| `platform_fields` | personal fields the platform adds to **every** entity, described once and in full: `created_by` is the email of the account that created the row. Each has `label`, `category`, `titular`, `purposes`, `retention`, `deletion` and `derived_from`. They apply to every entity, including those under `no_personal_data`, and the notice prints them once |
 | `titulares` | id → `label` |
 | `purposes` | id → `label`, `requires_consent`, optional `automated_decision` |
 | `recipients` | id → `label`, `role` (`encargado` \| `third_party`), `does`, `country`; a `third_party` also has `legal_basis`: the art. 36 fraction a lawyer confirmed, or `null`. Acceptance is required exactly when it is `null` |
 | `entities` | every entity that holds personal data |
-| `no_personal_data` | every other entity, mapped to the list of its fields |
+| `no_personal_data` | every other entity, mapped to the list of its fields. It means "nothing personal beyond `platform_fields`", never "nothing personal": the creator's email is on these rows too, and deleting an account anonymizes it there as everywhere else |
 | `collection_points` | every way personal data enters |
 | `stores` | every place personal data is kept outside an entity |
 
@@ -103,9 +103,12 @@ An app's own `Session` entity (Module 20) is an entity, not this store;
    `written_by` is the handler of a collection point that collects that
    `store:<key>`, and every point that collects `store:<key>` is named in a
    `written_by` there. `["platform"]` is exempt from both.
-6. Every function, and on a router every action, whose `acts_on` names a purpose with `requires_consent` or
-   `automated_decision`, or a transfer to a recipient with
-   `legal_basis: null`, calls the consent helper.
+6. Every function, and on a router every action, whose `acts_on` names a
+   purpose with `requires_consent` or `automated_decision`, or a transfer to
+   a recipient with `legal_basis: null`, calls the consent helper. That the
+   handler then *obeys* the answer is not something a static check can see;
+   the verification gate tests it at runtime, for optional purposes,
+   transfers and objections to automated decisions alike.
 7. Lint: no raw write to a store outside its module. Test: an undeclared key
    and a personal-looking value under a non-personal key both throw.
 8. `notice_hash` equals the hash of the generator's output; if it differs

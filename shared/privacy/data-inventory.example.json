@@ -3,7 +3,15 @@
   "notice_hash": "sha256:<computed by CI over the generator's output>",
   "platform_fields": {
     "created_by": {
-      "ref": "User.email"
+      "label": "Correo de la cuenta que creó el registro",
+      "category": "contact",
+      "titular": "account_user",
+      "derived_from": "User.email",
+      "purposes": [
+        "record_authorship"
+      ],
+      "retention": "Mientras exista el registro",
+      "deletion": "Se vuelve anónimo al borrar la cuenta"
     }
   },
   "titulares": {
@@ -50,6 +58,10 @@
     "insurance_quote": {
       "label": "Cotizarte un seguro para tu compra",
       "requires_consent": true
+    },
+    "record_authorship": {
+      "label": "Saber qué cuenta creó o modificó cada registro",
+      "requires_consent": false
     }
   },
   "recipients": {

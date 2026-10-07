@@ -260,7 +260,9 @@ jospabloh/acacia-app-standard. Status:
       GENERATED from the inventory and the served text is diffed against the
       generator's output. Consent
       recorded by notice version at every collection point, keyed to the
-      titular (not only account users); express for financial data; no sensitive
+      titular (not only account users), and ENFORCED: every function acting
+      on an optional purpose or an acceptance-requiring transfer checks the
+      latest record first, so an unticked box or a revocation stops it; express for financial data; no sensitive
       data by default. A named person or department handles ARCO; a request is
       a Module 8 ticket of category `arco` with folio and due date. Deleting
       a person anonymizes the personal fields, keeps the transaction, and

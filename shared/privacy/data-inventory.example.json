@@ -211,6 +211,23 @@
       "consent_boxes": []
     },
     {
+      "id": "login",
+      "path": "src/pages/Login.jsx",
+      "kind": "signup",
+      "handler": "session#start",
+      "filled_by": "the account user",
+      "collects": [
+        "store:auth_and_sessions",
+        "store:logs"
+      ],
+      "purposes": [
+        "session_security",
+        "debugging"
+      ],
+      "notice": "acacia",
+      "consent_boxes": []
+    },
+    {
       "id": "signup",
       "path": "src/pages/Register.jsx",
       "kind": "signup",

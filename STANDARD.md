@@ -1838,7 +1838,11 @@ schema. One entry per entity that holds personal data:
       "handler": "support#submitTicket",
       "filled_by": "the account user",
       "collects": ["SupportTicketMessage.body", "SupportTicketMessage.attachments"],
-      "purposes": ["support"], "notice": "acacia", "consent_boxes": [] }
+      "purposes": ["support"], "notice": "acacia", "consent_boxes": [] },
+    { "id": "login", "path": "src/pages/Login.jsx", "kind": "signup",
+      "handler": "session#start", "filled_by": "the account user",
+      "collects": ["store:auth_and_sessions", "store:logs"],
+      "purposes": ["session_security", "debugging"], "notice": "acacia", "consent_boxes": [] }
   ],
   "stores": {
     "auth_and_sessions": {
@@ -1970,7 +1974,9 @@ schema. One entry per entity that holds personal data:
   lists each form, import, API endpoint and inbound channel that receives
   personal data: its `id`, where it lives (`path`), its `kind` (`signup`,
   `public_form`, `back_office`, `import`, `api`, `inbound_message`), who
-  fills it in, exactly which fields it `collects` (`Entity.field`), the
+  fills it in, exactly which data it `collects` (`Entity.field` for a field,
+  `store:<key>` for data that only ever lands in a store, such as the IP
+  address and user agent that login writes to `auth_and_sessions`), the
   purpose ids it serves, whose notice it shows (`acacia` or `tenant`) and the
   consent boxes on it. Two forms that create the same entity are two entries:
   a public order page that asks for a name and a phone and a back-office
@@ -1987,7 +1993,11 @@ schema. One entry per entity that holds personal data:
   API endpoint or inbound webhook that accepts `Client.phone` cannot ride on
   the entry an existing form already has. A handler that receives personal
   data from outside the app (a webhook, an inbound WhatsApp message) is a
-  collection point like any form.
+  collection point like any form. The same check covers the stores: every
+  file in a store's `producers` that puts a store-only datum there is the
+  handler of a collection point that `collects` that `store:<key>`, so login
+  cannot write a session's IP address and be missing from the list and from
+  its simplified notice.
 - The notices, the ARCO path and deletion are **generated** from this file —
   `entities`, `stores`, `recipients` and `collection_points` — so a message
   body sent to an LLM cannot be in the app and missing from the notice.
@@ -2079,6 +2089,18 @@ login, the new purpose does not apply until they accept it at their next
 contact. Purposes with `requires_consent: true`
 (marketing, anything not needed to deliver the service) are separate,
 unticked, and refusing them never blocks the service.
+
+**A recorded choice that nothing reads is decoration.** Every function that
+acts on a purpose with `requires_consent: true`, or sends data to a
+`third_party` with `requires_acceptance: true`, asks one shared helper first
+— `hasConsent(titular, purposeOrTransfer)` — which reads that titular's
+**latest** `ConsentRecord` server-side and answers no when the box was left
+unticked, when consent was later revoked, or when there is no record at all.
+The function's `function.meta.json` lists the purposes it acts on, CI fails
+on one that names a consent-requiring purpose and never calls the helper, and
+the campaign that messages every client regardless of the box is the bug this
+exists to stop. Revocation (rule 6) writes a new record; it takes effect on
+the next call, not at the next deploy.
 
 ### 5. Financial, sensitive and minors' data
 
@@ -2216,7 +2238,7 @@ Each module's proof is a thing you can run and read.
 | 25 signup finishes | a new email+password user can activate their account | `grep -rn verifyOtp src/` reachable from Register **and** Login, `resendOtp` called; then live with a throwaway `+` address: register, skip the code, log in — the code field appears, the code lands you in the app |
 | 26 function metadata | every function says what it is for, and nothing is deployed that nothing calls | `npm run lint` green with the metadata check; `base44 functions list` equals the directories with `function.meta.json`; every `cron:` trigger matches an **active** workflow in `GET /api/apps/{id}/workflows` |
 | 27 `mario_style` (optional) | if adopted: the app has the style and celebrates only finishing | `src/styles/mario_style.css` and `src/lib/celebrate.js` byte-identical to `shared/mario_style/` (`cmp`); every `celebrate(` call sits after an awaited write, outside `catch`; layout scanner **and** screenshots clean at 320/390/834/1440 in light and dark on the **deployed** bundle. N/A for apps that did not adopt it |
-| 28 personal data | the notice describes the deployed app, and a request reaches a person | the inventory check green in CI against the **deployed** schema (`list_entity_schemas`), not the repo file — every deployed field classified, every recipient id in the registry with a role, every personal field reached by a collection point and every function that writes personal data named as a handler by one, `material_hash` current and `notice_version` ahead of `main` whenever it moved; **the served notices equal the generator's output**: regenerate the integral page and every simplified notice from the inventory and diff them against what `acaciaco-site` and the deployed app actually serve, whole text, not field names; lint green on the one-door rule (no raw write to a store outside its module) and the allowlist test green; open each `collection_points` entry in the deployed app and confirm it asks for exactly the fields it declares; for **every** `collection_points` entry — each public form, signup, the contact form, each API or inbound handler — submit it once with its consent boxes ticked (without an account where the titular has none) and read back its `ConsentRecord`: the right titular, the current `notice_version`, exactly the purposes accepted; raise an `arco` ticket from a throwaway account and read the folio and due date back in Mission Control; delete a test customer and read back one `DeletionReceipt` for **every** recipient the inventory names for that data — gone from the app and the bodega, a provider acknowledgement where a request was needed, `not_deletable` only where the inventory and the notice already say so; the PR that published the notice names the lawyer who reviewed it |
+| 28 personal data | the notice describes the deployed app, and a request reaches a person | the inventory check green in CI against the **deployed** schema (`list_entity_schemas`), not the repo file — every deployed field classified, every recipient id in the registry with a role, every personal field reached by a collection point and every function that writes personal data named as a handler by one, `material_hash` current and `notice_version` ahead of `main` whenever it moved; **the served notices equal the generator's output**: regenerate the integral page and every simplified notice from the inventory and diff them against what `acaciaco-site` and the deployed app actually serve, whole text, not field names; lint green on the one-door rule (no raw write to a store outside its module) and the allowlist test green; open each `collection_points` entry in the deployed app and confirm it asks for exactly the fields it declares; for **every** `collection_points` entry — each public form, signup, the contact form, each API or inbound handler — submit it once with its consent boxes ticked (without an account where the titular has none) and read back its `ConsentRecord`: the right titular, the current `notice_version`, exactly the purposes accepted; then submit it **unticked**, and separately tick and **revoke**, and confirm in both cases that every consent-dependent function skips that titular (no message sent, no transfer made) while the ones who accepted are still processed; raise an `arco` ticket from a throwaway account and read the folio and due date back in Mission Control, then raise one **as a person with no account** (a tenant's customer, through the public intake) and read back its folio, due date, the tenant it belongs to and the tenant admin it was routed to; run **every distinct deletion path** the inventory declares — one per `titular` (the account user, a tenant's customer, an employee, a lead…), plus the tenant itself and any store-only data — and for each read back one `DeletionReceipt` for **every** recipient the inventory names for that data: gone from the app and the bodega, a provider acknowledgement where a request was needed, `not_deletable` only where the inventory and the notice already say so; the PR that published the notice names the lawyer who reviewed it |
 
 ---
 

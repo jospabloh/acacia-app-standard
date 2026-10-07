@@ -1404,6 +1404,34 @@ nothing about where the user actually is in the app changed.
    navigation state the user didn't ask to reset. Those are two different
    kinds of "start over," and an ordinary refresh should only ever trigger
    the first.
+4. **Choosing a menu item never moves the menu.** A reload is only one way
+   to lose the scroll position; plain in-app navigation is the other, and
+   the more common one. Rumbo shipped it (fixed 2026-10-07, v1.36.1): scroll
+   the sidebar down, pick an item below the fold, and the item got selected
+   while the menu jumped back to the top, leaving the highlight out of view.
+   The cause was a component declared **inside** `Layout`'s render
+   (`const SidebarContent = () => (…)`, used as `<SidebarContent/>`). Every
+   render creates a new component type, so each route change made React
+   unmount and remount the whole `<nav>`, and its `scrollTop` went back to 0.
+   Rules:
+   - Never declare a component inside another component's body and render
+     it as JSX. Either move it to module scope (pass what it needs as props)
+     or call it as a plain function (`{renderSidebarContent(onClick)}`), so
+     the `<nav>` element stays mounted across navigations.
+   - The scrollable `<nav>` keeps its `scrollTop` when the route changes.
+     Nothing scrolls it to the top on navigation.
+   - A mobile drawer that closes on selection is the one place where the nav
+     legitimately remounts. When it reopens, bring the active item into view
+     (`querySelector('nav [aria-current="page"]')?.scrollIntoView({ block: 'nearest' })`),
+     so the user never has to look for where they are. The active item
+     carries `aria-current="page"`, which is also what makes this selector
+     work.
+   - **Proof:** scroll the nav to the bottom, click its last item, and read
+     the nav's `scrollTop` after navigation. It must be unchanged on desktop,
+     and the active item must sit inside the nav's visible box. On a phone
+     width, reopen the drawer and check the same visibility. Rumbo's check
+     (Playwright, production build, mocked backend) read `739 → 0` before
+     the fix and `739 → 739` after.
 
 ---
 
@@ -2202,7 +2230,10 @@ Each module's proof is a thing you can run and read.
 20. The left nav derives its active item from the current route on every
     render, and persists any non-route-derived UI state (expanded groups,
     scroll position) via `sessionStorage`, restored synchronously on mount
-    (Module 23) — so a reload never visibly resets navigation chrome.
+    (Module 23) — so a reload never visibly resets navigation chrome. Picking
+    a menu item never moves the menu either: no component declared inside a
+    render, the nav keeps its `scrollTop`, and a reopened mobile drawer
+    scrolls the `aria-current` item into view.
 21. If the app has email + password signup, give it an in-app verification-code
     step reachable from both Register and Login (Module 25) and prove it with a
     throwaway address before the first customer signs up.

@@ -230,7 +230,7 @@ jospabloh/acacia-app-standard. Status:
       mapped to this app's tokens; `--radius: 1rem`; Baloo 2 + Nunito; brand
       colour unchanged. `celebrate()` only after a successful write that
       finishes something. Verified with screenshots in both themes at
-      390/834/1440 on the deployed bundle. Guideline: STANDARD.md §27.
+      320/390/834/1440 on the deployed bundle. Guideline: STANDARD.md §27.
 
 Last audited against the standard: <date> — <what changed / what's still open>
 Last multi-tenant isolation audit: <date> — <scope, findings, what's unverified>

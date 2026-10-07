@@ -645,8 +645,12 @@ different repo from every app. Adding an entity with a phone number changes
 nothing there, and no check connects the two. The notice was last edited
 2026-04-28; the apps have changed many times since.
 
-**What changed.** Module 28: a `privacy/data-inventory.json` per app that CI
-keeps equal to the schema, the notice written from it, ACACIA's role decided
-per data category, an ARCO path through Module 8, and deletion that reaches
-Mission Control's bodega. Nothing was fixed in any app or on the site by this
-entry; every app is red on Module 28 until it does the work.
+**What changed.** Module 28: one notice for the whole portfolio at
+`acaciaco.com.mx/legal/privacidad`, which every app links to; a
+`privacy/data-inventory.json` per app whose classification of every deployed
+field CI enforces; the app's section of the notice kept equal to that
+inventory; ACACIA's role decided per kind of data; consent recorded and
+obeyed; an ARCO path through Module 8; and deletion that reaches Mission
+Control's bodega. A first reading of the eleven deployed schemas is in the
+module. Nothing was fixed in any app by this entry; every app is red on
+Module 28 until it does the work.

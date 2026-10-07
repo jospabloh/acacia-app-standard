@@ -232,39 +232,34 @@ jospabloh/acacia-app-standard. Status:
       finishes something. Verified with screenshots in both themes at
       320/390/834/1440 on the deployed bundle. Guideline: STANDARD.md §27.
 - [ ] Module 28 — Personal data: applies to any app with accounts (the
-      account email counts). `privacy/data-inventory.json` classifies EVERY
-      deployed field as personal or not and describes every personal datum:
-      kind, whose (and whether minors), ACACIA's role, purposes, where it
-      goes and, for each place it is kept, retention and deletion — including
-      sessions, files, logs, analytics, browser storage, what outbound
-      providers keep, and Mission Control's bodega. Every form, import, API
-      and inbound channel is a listed collection point. The file is checked
-      against the app: entities with personal data are closed to client
-      writes in the deployed schema, each function's `ingress` matches a
-      collection point, and each store is written through one module that
-      rejects undeclared keys. Per category ACACIA is responsable (account,
-      billing, leads, support) or encargada (what a tenant loads about its
-      own people); the second needs a data-processing clause, and no public
-      form of a tenant is published without that tenant's complete notice.
-      Integral notice at `acaciaco-site/legal/privacidad/<slug>` and a
-      simplified one at every form the titular fills in, both GENERATED and
-      diffed against what is served; people whose data the tenant's staff
-      entered get the notice by attestation or by message; `notice_version` moves when their text
-      does. Consent is recorded per choice at every such form, keyed to the
-      titular, and OBEYED: functions check it before acting on an optional
-      purpose or a third-party transfer. Express consent for financial data;
-      no sensitive data by default. A named person or department handles
-      ARCO; requests are `arco` tickets with folio and due date, with a
-      public intake for people with no account. Deleting a person anonymizes
-      the personal fields, keeps the transaction, and leaves a
-      `DeletionReceipt` for every place the data was kept. No security or
-      compliance claim nobody can prove. Reviewed by a lawyer before
-      publishing. The schema in `shared/privacy/` is a DRAFT; the seven
-      requirements of rule 1 are not.
+      account email counts). ONE notice for the whole portfolio lives at
+      acaciaco.com.mx/legal/privacidad; this app links to it from login,
+      signup and About, never copies its text, and shows a simplified notice
+      at every form a person fills in themselves. `privacy/data-inventory.json`
+      marks EVERY deployed field personal or not and records, for what is
+      personal: kind, whose (and whether minors), ACACIA's role, uses and
+      which need consent, and every place it goes or is kept (the bodega,
+      providers, files, logs, sessions, browser) with retention and deletion
+      there. CI fails on an unclassified deployed field. This app's section
+      of the notice says everything the inventory says, and the notice is
+      updated BEFORE an app change that alters it ships. ACACIA is
+      responsable (account, billing, leads, support) or encargada (what a
+      tenant loads about its own people); the second needs a data-processing
+      clause, and no public form of a tenant is published without that
+      tenant's notice. Optional uses and third-party transfers have their own
+      unticked box; the choice is recorded per person and OBEYED by the
+      function behind that use. Express consent for financial data;
+      sensitive data only from an authenticated person, and not by default.
+      People whose data the tenant's staff entered get the notice. A named
+      person or department handles ARCO; requests are `arco` tickets with
+      folio and due date, open to people with no account. Deleting a person
+      anonymizes the personal fields, keeps the transaction, and leaves a
+      record of what was done in every place the data was kept. No security
+      or compliance claim nobody can prove.
 
 Last audited against the standard: <date> — <what changed / what's still open>
 Last multi-tenant isolation audit: <date> — <scope, findings, what's unverified>
 Secrets last read back: <date> — <which ones, and how each was proven>
 Security locks last checked for drift (Module 19): <date> — <deployed vs. repo, any found open>
-Privacy notice last checked (Module 28): <date> — <inventory vs. deployed schema, law/Reglamento re-read, who reviewed>
+Privacy last checked (Module 28): <date> — <inventory vs. deployed schema, this app's section of the notice, who reviewed>
 ```

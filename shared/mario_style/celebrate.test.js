@@ -57,6 +57,18 @@ describe('originPoint', () => {
     expect(p.y).toBe(window.innerHeight * 0.3);
   });
 
+  // A row that overflows sideways can push the button off-screen while it is
+  // still attached: that counts as gone too, not as a burst drawn off-canvas.
+  it('falls back to the top-centre when the element is off-screen sideways', () => {
+    const el = document.createElement('button');
+    document.body.appendChild(el);
+    vi.spyOn(el, 'getBoundingClientRect').mockReturnValue(
+      /** @type {DOMRect} */ ({ left: window.innerWidth + 50, right: window.innerWidth + 150, top: 10, bottom: 40, width: 100, height: 30 }),
+    );
+    expect(originPoint(el)).toEqual({ x: window.innerWidth / 2, y: window.innerHeight * 0.3 });
+    el.remove();
+  });
+
   it('uses explicit coordinates as given', () => {
     expect(originPoint({ x: 5, y: 7 })).toEqual({ x: 5, y: 7 });
   });

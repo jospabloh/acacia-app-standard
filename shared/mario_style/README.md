@@ -63,7 +63,11 @@ Do them in this order; each step is visible on its own.
 4. **Components.** Copy `mario_style.css`, then in the shadcn primitives:
    - `button.jsx` base `rounded-xl font-bold`; `default` → `play-press play-press--primary`,
      `destructive` → `play-press play-press--danger`, `outline` → `border-2 bg-card play-press play-press--neutral`,
-     `secondary` → `play-press play-press--neutral`. Drop their `shadow*` classes.
+     `secondary` → `play-press play-press--neutral`. Drop their `shadow*` classes
+     **and their hover colour utilities** (`hover:bg-primary/90`,
+     `hover:bg-secondary/80`, `hover:bg-accent`, `hover:text-accent-foreground`):
+     `.play-press` signals hover by lifting the button, and a tinted fill on
+     hover is exactly what lowered text contrast before.
      `ghost` and `link` stay flat.
    - `card.jsx` → `rounded-2xl border-2 play-card`; `CardTitle` → `font-display text-lg font-bold`.
    - `badge.jsx` → `rounded-full font-bold`.

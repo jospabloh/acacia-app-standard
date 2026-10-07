@@ -74,7 +74,7 @@ export function originPoint(target) {
   if (target && typeof target.x === 'number' && typeof target.y === 'number') return { x: target.x, y: target.y };
   if (target && target.isConnected && typeof target.getBoundingClientRect === 'function') {
     const r = target.getBoundingClientRect();
-    if (r.width > 0 && r.height > 0 && r.bottom > 0 && r.top < vh) {
+    if (r.width > 0 && r.height > 0 && r.bottom > 0 && r.top < vh && r.right > 0 && r.left < vw) {
       return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
     }
   }

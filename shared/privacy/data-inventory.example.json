@@ -72,6 +72,32 @@
       ],
       "retention": "while the tenant is active; fiscal fields for as long as tax law requires",
       "deletion": "anonymize name/phone/rfc, keep the transaction rows"
+    },
+    "SupportTicketMessage": {
+      "titular": "account_user",
+      "acacia_role": "responsable",
+      "fields": {
+        "body": {
+          "category": "identification"
+        },
+        "attachments": {
+          "category": "identification"
+        }
+      },
+      "minors": false,
+      "purposes": [
+        {
+          "id": "support",
+          "requires_consent": false
+        }
+      ],
+      "source": "entered_by_titular",
+      "recipients": [
+        "base44",
+        "mission-control-bodega"
+      ],
+      "retention": "while the account exists",
+      "deletion": "removed with the ticket"
     }
   },
   "no_personal_data": [
@@ -81,39 +107,68 @@
   "stores": {
     "auth_and_sessions": {
       "holds": [
-        "email",
-        "ip_address",
-        "user_agent"
-      ],
-      "retention": "revoked after 48h idle (Module 20)"
+        {
+          "datum": "ip_address, user_agent",
+          "category": "identification",
+          "titular": "account_user",
+          "acacia_role": "responsable",
+          "purposes": [
+            {
+              "id": "session_security",
+              "requires_consent": false
+            }
+          ],
+          "recipients": [
+            "base44"
+          ],
+          "retention": "revoked after 48h idle (Module 20)",
+          "deletion": "removed with the session"
+        }
+      ]
     },
     "files": {
       "holds": [
-        "ticket attachments"
-      ],
-      "retention": "with the ticket"
+        {
+          "ref": "SupportTicketMessage.attachments"
+        }
+      ]
     },
     "logs": {
       "holds": [
-        "user id",
-        "ip_address"
-      ],
-      "retention": "platform default, about 13 hours"
+        {
+          "datum": "user id, ip_address",
+          "category": "identification",
+          "titular": "account_user",
+          "acacia_role": "responsable",
+          "purposes": [
+            {
+              "id": "debugging",
+              "requires_consent": false
+            }
+          ],
+          "recipients": [
+            "base44"
+          ],
+          "retention": "platform default, about 13 hours",
+          "deletion": "expires; cannot be deleted on request"
+        }
+      ]
     },
     "analytics": {
       "holds": []
     },
     "browser_storage": {
-      "holds": [
-        "theme preference"
-      ]
+      "holds": []
     },
     "outbound_messages": {
       "holds": [
-        "recipient email",
-        "message body"
-      ],
-      "retention": "provider default"
+        {
+          "ref": "Client.phone"
+        },
+        {
+          "ref": "Client.name"
+        }
+      ]
     }
   }
 }

@@ -120,7 +120,16 @@ La casilla de una finalidad que requiere consentimiento nunca viene marcada.
 ## C. Para el tenant — aviso propio
 
 Cuando el tenant recaba datos de sus propias personas a través de la app
-(clientes, visitantes, socios), la app le da un campo para publicar su aviso
-y lo muestra en ese punto de recabación. Sin aviso cargado, la pantalla
-pública muestra al menos: quién es el responsable (el tenant, con su
-domicilio) y para qué pide los datos.
+(clientes, visitantes, socios), el responsable es el tenant y el aviso es
+suyo. La app no deja ese punto de recabación sin aviso completo:
+
+- La app **genera** el aviso del tenant en sus dos formas (A y B de este
+  archivo) a partir del inventario —qué datos pide ese formulario y para
+  qué— y de los datos del tenant: nombre o razón social, domicilio completo
+  y contacto de privacidad.
+- Esos tres datos son obligatorios en la configuración del tenant. **Mientras
+  falten, el formulario público no se publica.**
+- El formulario muestra el aviso simplificado (identidad y domicilio, datos
+  que se piden, finalidades separando las que requieren consentimiento, cómo
+  limitar su uso) y el enlace al aviso integral del tenant.
+- El tenant puede sustituir el texto generado por el suyo. No puede quitarlo.

@@ -237,11 +237,14 @@ jospabloh/acacia-app-standard. Status:
       Mission Control's bodega, retention, deletion) and CI fails on an entity
       missing from it. The six non-entity `stores` (auth and sessions, files,
       logs, analytics, browser storage, outbound messages) are each declared,
-      empty or not. Applies to any app with accounts: the account email counts.
+      empty or not, and every datum in one is either a `ref` to a described
+      entity field or carries the same metadata an entity does. Applies to any app with accounts: the account email counts.
       Per category, ACACIA is either responsable (account, billing, leads,
       support) or encargada (what a tenant loads about its own people) — the
-      second needs a data-processing clause and a place for the tenant's own
-      notice. Integral notice at `acaciaco-site/legal/privacidad/<slug>` with
+      second needs a data-processing clause, and no public form of a tenant
+      is published until the app can show that tenant's complete notice
+      (generated from the inventory plus the tenant's identity, address and
+      privacy contact). Integral notice at `acaciaco-site/legal/privacidad/<slug>` with
       the six items of art. 15 of the 2025 LFPDPPP plus revocation,
       sub-processors and retention; simplified notice at EVERY form. Consent
       recorded by notice version at every collection point, keyed to the

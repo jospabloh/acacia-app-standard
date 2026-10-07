@@ -37,11 +37,30 @@ function reducedMotion() {
   }
 }
 
+/**
+ * Splits a comma-separated colour list on top-level commas only, so legacy
+ * functional colours like `rgb(47, 107, 242)` stay whole instead of breaking
+ * into fragments that canvas would silently ignore.
+ */
+export function splitColors(raw) {
+  const out = [];
+  let depth = 0;
+  let current = '';
+  for (const ch of String(raw || '')) {
+    if (ch === '(') depth += 1;
+    if (ch === ')') depth = Math.max(0, depth - 1);
+    if (ch === ',' && depth === 0) { out.push(current); current = ''; continue; }
+    current += ch;
+  }
+  out.push(current);
+  return out.map((c) => c.trim()).filter(Boolean);
+}
+
 /** Colours come from `--play-confetti` (comma-separated) so each app keeps its palette. */
 function palette() {
   try {
     const raw = getComputedStyle(document.documentElement).getPropertyValue('--play-confetti');
-    const list = raw.split(',').map((c) => c.trim()).filter(Boolean);
+    const list = splitColors(raw);
     return list.length ? list : FALLBACK_COLORS;
   } catch {
     return FALLBACK_COLORS;

@@ -2,7 +2,7 @@
 // copy (e.g. src/lib/__tests__/celebrate.test.js) and fix the import path only.
 // Runs under vitest + jsdom.
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { celebrate, originPoint, pop } from '@/lib/celebrate';
+import { celebrate, originPoint, pop, splitColors } from '@/lib/celebrate';
 
 function setReducedMotion(reduce) {
   window.matchMedia = vi.fn().mockImplementation((q) => ({
@@ -68,5 +68,19 @@ describe('pop', () => {
     const el = document.createElement('div');
     expect(pop(el)).toBe(false);
     expect(el.classList.contains('play-pop')).toBe(false);
+  });
+});
+
+describe('splitColors', () => {
+  // An app may map --play-confetti with legacy comma syntax; splitting on every
+  // comma would turn rgb(47, 107, 242) into three invalid fragments.
+  it('keeps functional colours whole', () => {
+    expect(splitColors('rgb(47, 107, 242), #ffc53d, hsl(220, 90%, 55%)'))
+      .toEqual(['rgb(47, 107, 242)', '#ffc53d', 'hsl(220, 90%, 55%)']);
+  });
+
+  it('handles space syntax, extra spaces and empty input', () => {
+    expect(splitColors(' hsl(217 91% 50%) ,  #2fbf63 ')).toEqual(['hsl(217 91% 50%)', '#2fbf63']);
+    expect(splitColors('')).toEqual([]);
   });
 });

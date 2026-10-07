@@ -1797,30 +1797,59 @@ schema. One entry per entity that holds personal data:
       "recipients": ["base44", "mission-control-bodega", "meta-whatsapp"],
       "retention": "while the tenant is active; fiscal fields for as long as tax law requires",
       "deletion": "anonymize name/phone/rfc, keep the transaction rows"
+    },
+    "SupportTicketMessage": {
+      "titular": "account_user",
+      "acacia_role": "responsable",
+      "fields": { "body": { "category": "identification" }, "attachments": { "category": "identification" } },
+      "minors": false,
+      "purposes": [{ "id": "support", "requires_consent": false }],
+      "source": "entered_by_titular",
+      "recipients": ["base44", "mission-control-bodega"],
+      "retention": "while the account exists",
+      "deletion": "removed with the ticket"
     }
   },
   "no_personal_data": ["Product", "Warehouse"],
   "stores": {
-    "auth_and_sessions": { "holds": [
-      { "datum": "ip_address, user_agent", "category": "identification",
-        "titular": "account_user", "acacia_role": "responsable",
-        "purposes": [{ "id": "session_security", "requires_consent": false }],
-        "recipients": ["base44"],
-        "retention": "revoked after 48h idle (Module 20)",
-        "deletion": "removed with the session" }
-    ] },
-    "files": { "holds": [{ "ref": "SupportTicketMessage.attachments" }] },
-    "logs": { "holds": [
-      { "datum": "user id, ip_address", "category": "identification",
-        "titular": "account_user", "acacia_role": "responsable",
-        "purposes": [{ "id": "debugging", "requires_consent": false }],
-        "recipients": ["base44"],
-        "retention": "platform default, about 13 hours",
-        "deletion": "expires; cannot be deleted on request" }
-    ] },
-    "analytics": { "holds": [] },
-    "browser_storage": { "holds": [] },
-    "outbound_messages": { "holds": [{ "ref": "Client.phone" }, { "ref": "Client.name" }] }
+    "auth_and_sessions": {
+      "producers": ["functions/session/entry.ts"],
+      "holds": [
+        { "datum": "ip_address, user_agent", "category": "identification",
+          "titular": "account_user", "acacia_role": "responsable",
+          "purposes": [{ "id": "session_security", "requires_consent": false }],
+          "recipients": ["base44"],
+          "retention": "revoked after 48h idle (Module 20)",
+          "deletion": "removed with the session" }
+      ] },
+    "files": {
+      "producers": ["src/pages/Support.jsx"],
+      "holds": [
+        { "ref": "SupportTicketMessage.attachments", "provider": "base44",
+          "retention": "with the ticket", "deletion": "file removed when the ticket is" }
+      ] },
+    "logs": {
+      "producers": ["functions/session/entry.ts", "functions/quotations/entry.ts"],
+      "holds": [
+        { "datum": "user id, ip_address", "category": "identification",
+          "titular": "account_user", "acacia_role": "responsable",
+          "purposes": [{ "id": "debugging", "requires_consent": false }],
+          "recipients": ["base44"],
+          "retention": "platform default, about 13 hours",
+          "deletion": "expires; cannot be deleted on request" }
+      ] },
+    "analytics": { "producers": [], "holds": [] },
+    "browser_storage": { "producers": [], "holds": [] },
+    "outbound_messages": {
+      "producers": ["functions/notify/entry.ts"],
+      "holds": [
+        { "ref": "Client.phone", "provider": "meta-whatsapp",
+          "retention": "kept by the provider under its own policy",
+          "deletion": "cannot be deleted from the app; the notice says so" },
+        { "ref": "Client.name", "provider": "meta-whatsapp",
+          "retention": "kept by the provider under its own policy",
+          "deletion": "cannot be deleted from the app; the notice says so" }
+      ] }
   }
 }
 ```
@@ -1850,18 +1879,31 @@ schema. One entry per entity that holds personal data:
   WhatsApp or LLM provider keeps). Each key is present with what it `holds`;
   an empty list is an explicit "nothing", and a missing key fails CI.
 - **A datum in a store is described as fully as a field in an entity.** Each
-  item in `holds` is one of two things. `{ "ref": "Entity.field" }` says this
-  store keeps a copy of a field already described above; it inherits that
-  field's titular, role, purposes and retention, and the entity's `recipients`
-  must name the store's provider (a phone sent to WhatsApp lists
-  `meta-whatsapp`). Or it is a full description with the same keys an entity
-  has — `datum`, `category`, `titular`, `acacia_role`, `purposes`,
+  item in `holds` is one of two things. A full description with the same keys
+  an entity has — `datum`, `category`, `titular`, `acacia_role`, `purposes`,
   `recipients`, `retention`, `deletion` — for data that exists nowhere else,
-  such as an IP address in a log. A bare string fails CI. The notice, the ARCO
-  path and deletion are generated from `entities` **and** `stores`, so a
-  message body sent to an LLM cannot be in the app and missing from the
-  notice. The schema cannot check these, so the gate does: each store is read
-  from the running app and compared with the file.
+  such as an IP address in a log. Or a reference,
+  `{ "ref": "Entity.field", "provider", "retention", "deletion" }`, for a copy
+  of a field already described above. A reference inherits **what the datum is
+  and whose** (category, titular, role, purposes) and nothing else: the copy's
+  `retention` and `deletion` are stated on the reference, every time, because
+  deleting `Client.phone` in the app does not delete the message Meta already
+  holds. Where the provider's copy cannot be deleted on request, the inventory
+  says exactly that and so does the notice. A bare string fails CI.
+- **Every writer to a store is listed.** `producers` names each file that
+  writes to that store, and CI finds them itself instead of trusting the
+  list: it scans for the calls that write there — logger and `console.*` calls
+  in backend functions for `logs`, upload calls for `files`, `localStorage`,
+  `sessionStorage` and `document.cookie` for `browser_storage`, the analytics
+  SDK for `analytics`, integration and outbound `fetch` calls for
+  `outbound_messages`, session writes for `auth_and_sessions` — and fails on
+  a call site in a file `producers` does not name, and on a named file with no
+  such call. A second function that starts logging an email address therefore
+  turns CI red until someone adds it and describes what it writes. This is
+  Module 26's declared-callers check, pointed at data instead of functions.
+- The notice, the ARCO path and deletion are generated from `entities` **and**
+  `stores`, so a message body sent to an LLM cannot be in the app and missing
+  from the notice.
 
 ### 2. Decide who is the *responsable* for each category, before writing a word
 
@@ -2070,7 +2112,7 @@ Each module's proof is a thing you can run and read.
 | 25 signup finishes | a new email+password user can activate their account | `grep -rn verifyOtp src/` reachable from Register **and** Login, `resendOtp` called; then live with a throwaway `+` address: register, skip the code, log in — the code field appears, the code lands you in the app |
 | 26 function metadata | every function says what it is for, and nothing is deployed that nothing calls | `npm run lint` green with the metadata check; `base44 functions list` equals the directories with `function.meta.json`; every `cron:` trigger matches an **active** workflow in `GET /api/apps/{id}/workflows` |
 | 27 `mario_style` (optional) | if adopted: the app has the style and celebrates only finishing | `src/styles/mario_style.css` and `src/lib/celebrate.js` byte-identical to `shared/mario_style/` (`cmp`); every `celebrate(` call sits after an awaited write, outside `catch`; layout scanner **and** screenshots clean at 320/390/834/1440 in light and dark on the **deployed** bundle. N/A for apps that did not adopt it |
-| 28 personal data | the notice describes the deployed app, and a request reaches a person | the inventory check green in CI against the **deployed** schema (`list_entity_schemas`), not the repo file; each of the six `stores` read from the running app (cookies and `localStorage` in the browser, one function log, one uploaded file, the provider's message log) and matching the file; submit a public form with the optional box ticked, without an account, and find its `ConsentRecord`; every field named in the published notice exists in the inventory and the reverse; raise an `arco` ticket from a throwaway account and read the folio and due date back in Mission Control; delete a test customer and confirm the personal fields are gone from the app **and** from the bodega; the PR that published the notice names the lawyer who reviewed it |
+| 28 personal data | the notice describes the deployed app, and a request reaches a person | the inventory check green in CI against the **deployed** schema (`list_entity_schemas`), not the repo file; for the six `stores`, the producer scan green (no call site that writes to a store outside the files `producers` names) and then, for **every** producer listed, one artifact it wrote read from the running app and matching what the file says it holds — every logging function's output, every upload path, every outbound integration, the browser's cookies and `localStorage` — not one sample per store; submit a public form with the optional box ticked, without an account, and find its `ConsentRecord`; every field named in the published notice exists in the inventory and the reverse; raise an `arco` ticket from a throwaway account and read the folio and due date back in Mission Control; delete a test customer and confirm the personal fields are gone from the app **and** from the bodega; the PR that published the notice names the lawyer who reviewed it |
 
 ---
 

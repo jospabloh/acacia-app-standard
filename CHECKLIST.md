@@ -237,8 +237,10 @@ jospabloh/acacia-app-standard. Status:
       Mission Control's bodega, retention, deletion) and CI fails on an entity
       missing from it. The six non-entity `stores` (auth and sessions, files,
       logs, analytics, browser storage, outbound messages) are each declared,
-      empty or not, and every datum in one is either a `ref` to a described
-      entity field or carries the same metadata an entity does. Applies to any app with accounts: the account email counts.
+      empty or not, with every file that writes to it listed as a producer
+      (CI scans for the write calls and fails on an unlisted one). Every
+      datum in a store either carries the same metadata an entity does or is
+      a `ref` that states the copy's own provider, retention and deletion. Applies to any app with accounts: the account email counts.
       Per category, ACACIA is either responsable (account, billing, leads,
       support) or encargada (what a tenant loads about its own people) — the
       second needs a data-processing clause, and no public form of a tenant

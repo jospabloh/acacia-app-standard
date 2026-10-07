@@ -106,6 +106,9 @@
   ],
   "stores": {
     "auth_and_sessions": {
+      "producers": [
+        "functions/session/entry.ts"
+      ],
       "holds": [
         {
           "datum": "ip_address, user_agent",
@@ -127,13 +130,23 @@
       ]
     },
     "files": {
+      "producers": [
+        "src/pages/Support.jsx"
+      ],
       "holds": [
         {
-          "ref": "SupportTicketMessage.attachments"
+          "ref": "SupportTicketMessage.attachments",
+          "provider": "base44",
+          "retention": "with the ticket",
+          "deletion": "file removed when the ticket is"
         }
       ]
     },
     "logs": {
+      "producers": [
+        "functions/session/entry.ts",
+        "functions/quotations/entry.ts"
+      ],
       "holds": [
         {
           "datum": "user id, ip_address",
@@ -155,18 +168,29 @@
       ]
     },
     "analytics": {
+      "producers": [],
       "holds": []
     },
     "browser_storage": {
+      "producers": [],
       "holds": []
     },
     "outbound_messages": {
+      "producers": [
+        "functions/notify/entry.ts"
+      ],
       "holds": [
         {
-          "ref": "Client.phone"
+          "ref": "Client.phone",
+          "provider": "meta-whatsapp",
+          "retention": "kept by the provider under its own policy",
+          "deletion": "cannot be deleted from the app; the notice says so"
         },
         {
-          "ref": "Client.name"
+          "ref": "Client.name",
+          "provider": "meta-whatsapp",
+          "retention": "kept by the provider under its own policy",
+          "deletion": "cannot be deleted from the app; the notice says so"
         }
       ]
     }

@@ -53,6 +53,19 @@ usando el servicio):
 - [avisos de novedades y promociones]
 - […]
 
+**Datos financieros o patrimoniales — requieren tu consentimiento expreso.**
+[Qué datos financieros o patrimoniales trata la app y para qué: por ejemplo,
+los movimientos y saldos que registras, o los datos de pago de tu
+suscripción.]
+☐ Sí, autorizo que [Responsable] trate estos datos para [finalidad].
+
+Esta casilla nunca viene marcada, se muestra en el punto donde se recaban
+esos datos y deja un `ConsentRecord`. El consentimiento tácito no basta para
+ellos, aunque la finalidad sea necesaria para el servicio. El bloque se omite
+solo en dos casos, y el PR dice cuál: la app no trata datos financieros ni
+patrimoniales de personas, o quien revisó el aviso documentó por escrito que
+aplica una excepción de ley (arts. 9 o 36).
+
 ### 5. Cómo limitar el uso o divulgación de tus datos
 [Dónde está el control en la app: Cuenta → Privacidad] o escribiendo a
 [correo]. [Qué pasa con cada opción.]
@@ -110,10 +123,13 @@ materia de protección de datos personales en posesión de particulares.
 > **[Responsable]**, con domicilio en [domicilio completo], usará tu [datos
 > que pide este formulario] para [finalidad necesaria]. [Si aplica: Con tu
 > permiso, también para [finalidad que requiere consentimiento].
-> ☐ Sí, acepto.] Puedes limitar su uso en [dónde]. Aviso integral:
+> ☐ Sí, acepto.] [Si el formulario pide datos financieros o patrimoniales:
+> ☐ Autorizo el tratamiento de mis datos financieros para [finalidad].]
+> Puedes limitar su uso en [dónde]. Aviso integral:
 > [acaciaco.com.mx/legal/privacidad/<slug>].
 
-La casilla de una finalidad que requiere consentimiento nunca viene marcada.
+Ninguna casilla viene marcada. La de datos financieros es obligatoria para
+enviar el formulario que los pide; la de una finalidad opcional no lo es.
 
 ---
 

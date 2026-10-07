@@ -1,0 +1,83 @@
+/*
+ * ACACIA portfolio "juego bonito" feel — shared, byte-identical across every
+ * app that adopts module 27. Change it in `jospabloh/acacia-app-standard` →
+ * `shared/playful/` and copy it out; never edit an app's copy.
+ *
+ * This file owns the *shape* of the feel (relief, press, pop). It owns no
+ * colour, font or radius of its own: every one of those comes from variables
+ * the app maps in its own stylesheet, so a tenant brand colour applied at
+ * runtime (e.g. Rumbo's applyTenantColors) flows straight into the relief.
+ *
+ *   :root {
+ *     --play-primary: hsl(var(--primary));      // filled button / active pill
+ *     --play-danger:  hsl(var(--destructive));
+ *     --play-edge:    hsl(var(--border));       // card + neutral button relief
+ *     --play-confetti: #2f6bf2, #ffc53d, #2fbf63, #ff5d5d;  // read by celebrate.js
+ *   }
+ *
+ * The relief shade is mixed from the fill with color-mix(), so it tracks the
+ * fill instead of needing a second hand-picked "dark" token per colour.
+ */
+
+:root {
+  --play-lift: 4px;        /* how far a button sits above its shadow */
+  --play-card-lift: 4px;   /* the same for cards and tiles */
+  --play-ease: cubic-bezier(.34, 1.56, .64, 1);  /* overshoot = the bounce */
+}
+
+/* ── Pressable relief ─────────────────────────────────────────────────────
+   A solid shadow straight down, no blur: reads as a physical button. On press
+   the button travels the lift distance and the shadow collapses, so the
+   control visibly goes "down". Set --play-fill (or use a modifier below). */
+.play-press {
+  --play-shade: color-mix(in srgb, var(--play-fill, var(--play-primary, #2f6bf2)) 72%, #000);
+  box-shadow: 0 var(--play-lift) 0 var(--play-shade);
+  transition: transform .08s ease, box-shadow .08s ease, filter .15s ease, background-color .15s ease;
+}
+.play-press:hover:not(:disabled) { filter: brightness(1.06); }
+.play-press:active:not(:disabled) {
+  transform: translateY(calc(var(--play-lift) - 1px));
+  box-shadow: 0 1px 0 var(--play-shade);
+}
+.play-press:disabled { box-shadow: 0 var(--play-lift) 0 var(--play-edge, #cbd5e1); }
+
+.play-press--primary { --play-fill: var(--play-primary, #2f6bf2); }
+.play-press--danger  { --play-fill: var(--play-danger, #e5484d); }
+/* Outline / secondary buttons: the relief is the edge colour itself, not a
+   darkened fill — a light button with a near-black shadow looks like a hole. */
+.play-press--neutral { --play-shade: var(--play-edge, #cbd5e1); }
+
+/* ── Card / tile relief ───────────────────────────────────────────────────
+   Same idea, one step quieter: cards are surfaces, not controls. */
+.play-card { box-shadow: 0 var(--play-card-lift) 0 var(--play-edge, #cbd5e1); }
+
+/* Interactive tiles (a card that is a link) lift a little on hover. */
+.play-lift-hover { transition: transform .2s var(--play-ease); }
+.play-lift-hover:hover { transform: translateY(-3px); }
+
+/* ── One-shot motion, triggered from celebrate.js (pop) or by class ────── */
+.play-pop    { animation: play-pop .5s var(--play-ease); }
+.play-wiggle { animation: play-wiggle .4s ease; }
+.play-rise   { animation: play-rise .45s var(--play-ease) both; }
+
+@keyframes play-pop    { 0% { transform: scale(1) } 40% { transform: scale(1.14) } 100% { transform: scale(1) } }
+@keyframes play-wiggle { 0%, 100% { transform: rotate(0) } 30% { transform: rotate(-6deg) } 60% { transform: rotate(5deg) } }
+/* Rises from a visible resting state (transform only, never opacity:0), so a
+   screenshot taken mid-animation still shows the content. */
+@keyframes play-rise   { from { transform: translateY(10px) } to { transform: none } }
+
+/* ── Quota as a "life bar" ────────────────────────────────────────────────
+   One block per unit when the limit is small enough to count at a glance. */
+.play-hp { display: grid; grid-template-columns: repeat(var(--play-hp-total, 10), minmax(0, 1fr)); gap: 3px; }
+.play-hp > span { height: 12px; border-radius: 4px; background: var(--play-track, #e2e8f0); }
+.play-hp > span[data-on] {
+  background: var(--play-hp-fill, var(--play-primary, #2f6bf2));
+  box-shadow: inset 0 -3px 0 color-mix(in srgb, var(--play-hp-fill, var(--play-primary, #2f6bf2)) 70%, #000);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .play-press, .play-lift-hover { transition: none; }
+  .play-press:active:not(:disabled) { transform: none; }
+  .play-lift-hover:hover { transform: none; }
+  .play-pop, .play-wiggle, .play-rise { animation: none; }
+}

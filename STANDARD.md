@@ -1653,6 +1653,67 @@ a copyable script. Say so in audits instead of marking it done.
 
 ---
 
+## 27. Visual feel — "juego bonito"
+
+Every app in the portfolio looks and feels like the same family, and that
+family is friendly: round, chunky, a little bouncy, closer to a well-made
+console game than to a grey admin console. Decided 2026-10-07 after a mockup of
+Rumbo in both styles side by side; Rumbo v1.36.0 is the reference.
+
+**What the feel is made of — and it is a short list on purpose.**
+
+- **Round.** One `--radius` knob (1rem) drives every Tailwind radius, so cards
+  land at 24px, buttons at 20px and small chips stay at 6px.
+- **Relief.** Filled buttons, active nav pills and KPI icon chips sit on a
+  solid shadow straight down (no blur) mixed from their own fill, and travel
+  down on press. Cards get a quieter edge-coloured relief. `ghost` and `link`
+  stay flat — they are text you can press, not physical buttons.
+- **Round type.** Baloo 2 for headings and big figures, Nunito for body text.
+- **Colour.** The app's brand colour never changes. Backgrounds move from grey
+  to a sky tint (light) and night blue (dark); borders take the same hue,
+  because they are also the relief colour.
+- **Rewards.** Confetti from the button that finished something, and a short
+  overshoot bounce. Nothing else moves on its own.
+- **Quota as a life bar.** Plan limits ≤ 30 render as one block per unit,
+  green → amber at 80% → red full.
+
+**The canonical files live in [`shared/playful/`](shared/playful/)** —
+`playful.css` (relief, press, pop, life bar) and `celebrate.js` (zero-dependency
+confetti) plus its test. They are byte-identical across apps and own no colour,
+font or radius: each app maps five `--play-*` variables to its own tokens, by
+live reference, so a tenant brand colour applied at runtime reaches the relief
+without code. The adoption steps are in that folder's README.
+
+**Celebrate finishing, not saving.** The rule that keeps rewards from turning
+into noise:
+
+- Only after the write **succeeded** — never in `catch`, never before the await.
+- Only for a moment that **finishes** something: a charge fully paid, an alert
+  resolved, a trip logged, a record created. An edit, a partial payment, a
+  settings change or a filter is not one.
+- Never awaited and never blocking. The canvas is click-through, and a modal
+  closes and a list refetches underneath it.
+- Off under `prefers-reduced-motion`. That is in `celebrate.js` itself and
+  covered by its test, so a call site cannot forget it.
+
+**Tone by audience, not by app.** The same components serve the owner looking
+at overdue rent and the driver logging a trip. The relief, rounding and type
+apply everywhere; confetti is reserved for the "done" moments above, which keeps
+money screens from feeling like a toy.
+
+**Done means verified on screen, not merged.** Nunito is wider than Inter, so
+the place this breaks is a tight row of buttons at 320px. Run the app's layout
+scanner if it has one (Rumbo: `scripts/layout-overlap-scan.mjs`) before and
+after, in both themes — module 12's rule that a theme ships finished or not at
+all applies to this palette too. And the usual deploy rule: merging deploys
+nothing; `npm run deploy:site` and check the served bundle.
+
+**Migrating an app on request.** The app's own `CLAUDE.md` records the date,
+the version and what was **not** verified (typically real Safari/iOS and
+screens behind a session).
+
+---
+
 ## Verification gates — what actually proves a module is live
 
 The recurring failure across this portfolio is not writing the code. It is
@@ -1683,6 +1744,7 @@ Each module's proof is a thing you can run and read.
 | 24 tenant roles | no tenant role reaches every tenant | only platform accounts hold built-in `admin` in live `User`; `check-tenant-roles.mjs` green in CI; deployed schema matches the checked files |
 | 25 signup finishes | a new email+password user can activate their account | `grep -rn verifyOtp src/` reachable from Register **and** Login, `resendOtp` called; then live with a throwaway `+` address: register, skip the code, log in — the code field appears, the code lands you in the app |
 | 26 function metadata | every function says what it is for, and nothing is deployed that nothing calls | `npm run lint` green with the metadata check; `base44 functions list` equals the directories with `function.meta.json`; every `cron:` trigger matches an **active** workflow in `GET /api/apps/{id}/workflows` |
+| 27 visual feel | the app looks like the family and celebrates only finishing | `src/styles/playful.css` and `src/lib/celebrate.js` byte-identical to `shared/playful/` (`cmp`); every `celebrate(` call sits after an awaited write, outside `catch`; layout scanner (or a 390/834/1440 look) clean in light and dark on the **deployed** bundle |
 
 ---
 
@@ -1752,7 +1814,11 @@ Each module's proof is a thing you can run and read.
     throwaway address before the first customer signs up.
 22. Give every backend function a `function.meta.json` from the first commit
     (Module 26), and wire the metadata check into `npm run lint`.
-23. Copy `CHECKLIST.md` from this repo into the new app's `CLAUDE.md`.
+23. Start from the module 27 feel, not the shadcn scaffold look: copy
+    [`shared/playful/`](shared/playful/), map the five `--play-*` variables,
+    set `--radius: 1rem` and the two fonts before the first screen is built —
+    restyling 30 finished screens later costs far more than starting round.
+24. Copy `CHECKLIST.md` from this repo into the new app's `CLAUDE.md`.
 
 See [`CHECKLIST.md`](CHECKLIST.md) for the compact, copy-pasteable version of
 this list, and [`docs/incidents.md`](docs/incidents.md) for the full postmortems

@@ -231,3 +231,12 @@ Security locks last checked for drift (Module 19): <date> — <deployed vs. repo
       or a `cron:` trigger without an existing workflow. Delete a function only
       with no callers, no deployed trigger and 7 days of captured logs showing
       no invocation.
+
+- [ ] Module 27 — Visual feel ("juego bonito"): `src/styles/playful.css` and
+      `src/lib/celebrate.js` byte-identical to `shared/playful/`, with the five
+      `--play-*` variables mapped to this app's tokens; `--radius: 1rem` drives
+      every Tailwind radius; Baloo 2 headings + Nunito body; filled buttons and
+      the active nav item carry `play-press`, cards `play-card`; brand colour
+      unchanged. `celebrate()` only after a successful write that finishes
+      something (paid, resolved, logged, created), never on edits. Verified in
+      both themes at 390/834/1440 on the deployed bundle. Rumbo is the reference.

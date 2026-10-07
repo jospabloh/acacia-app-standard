@@ -1826,13 +1826,16 @@ schema. One entry per entity that holds personal data:
   },
   "collection_points": [
     { "id": "public_order", "path": "src/pages/PublicOrder.jsx", "kind": "public_form",
+      "handler": "orders#createPublicOrder",
       "filled_by": "the tenant's customer", "collects": ["Client.name", "Client.phone"],
       "purposes": ["fulfil_orders", "marketing_whatsapp"], "notice": "tenant",
       "consent_boxes": ["marketing_whatsapp", "transfer:insurer-x"] },
     { "id": "client_import", "path": "src/pages/Clients.jsx", "kind": "import",
+      "handler": "clients#importClients",
       "filled_by": "the tenant's staff", "collects": ["Client.name", "Client.phone", "Client.rfc"],
       "purposes": ["fulfil_orders"], "notice": "tenant", "consent_boxes": [] },
     { "id": "support_form", "path": "src/pages/Support.jsx", "kind": "back_office",
+      "handler": "support#submitTicket",
       "filled_by": "the account user",
       "collects": ["SupportTicketMessage.body", "SupportTicketMessage.attachments"],
       "purposes": ["support"], "notice": "acacia", "consent_boxes": [] }
@@ -1842,7 +1845,7 @@ schema. One entry per entity that holds personal data:
       "producers": ["functions/session/entry.ts"],
       "holds": [
         { "datum": "ip_address, user_agent", "category": "identification",
-          "titular": "account_user", "acacia_role": "responsable",
+          "titular": "account_user", "minors": false, "acacia_role": "responsable",
           "purposes": [{ "id": "session_security", "requires_consent": false }],
           "recipients": ["base44"],
           "retention": "revoked after 48h idle (Module 20)",
@@ -1858,7 +1861,7 @@ schema. One entry per entity that holds personal data:
       "producers": ["functions/session/entry.ts", "functions/quotations/entry.ts"],
       "holds": [
         { "datum": "user id, ip_address", "category": "identification",
-          "titular": "account_user", "acacia_role": "responsable",
+          "titular": "account_user", "minors": false, "acacia_role": "responsable",
           "purposes": [{ "id": "debugging", "requires_consent": false }],
           "recipients": ["base44"],
           "retention": "platform default, about 13 hours",
@@ -1933,12 +1936,13 @@ schema. One entry per entity that holds personal data:
   an empty list is an explicit "nothing", and a missing key fails CI.
 - **A datum in a store is described as fully as a field in an entity.** Each
   item in `holds` is one of two things. A full description with the same keys
-  an entity has — `datum`, `category`, `titular`, `acacia_role`, `purposes`,
-  `recipients`, `retention`, `deletion` — for data that exists nowhere else,
+  an entity has — `datum`, `category`, `titular`, `minors`, `acacia_role`,
+  `purposes`, `recipients`, `retention`, `deletion` — for data that exists
+  nowhere else,
   such as an IP address in a log. Or a reference,
   `{ "ref": "Entity.field", "provider", "retention", "deletion" }`, for a copy
   of a field already described above. A reference inherits **what the datum is
-  and whose** (category, titular, role, purposes) and nothing else: the copy's
+  and whose** (category, titular, `minors`, role, purposes) and nothing else: the copy's
   `retention` and `deletion` are stated on the reference, every time, because
   deleting `Client.phone` in the app does not delete the message Meta already
   holds. Where the provider's copy cannot be deleted on request, the inventory
@@ -1953,7 +1957,14 @@ schema. One entry per entity that holds personal data:
   allowlist is dropped and reported in production and **throws under test**,
   so an error branch that starts logging an email address fails the test
   suite at that call site, whichever file it is in and however many other
-  writes the file has. `producers` lists the files that call the door, and CI
+  writes the file has. Keys are not enough, because an allowed `message` or
+  `error` can carry an address inside its text: the door also runs every
+  value under a key not declared as personal through a redactor (email,
+  phone, RFC and CURP patterns, plus the values of the personal fields in the
+  current request), masks a hit in production and throws on one under test.
+  A pattern cannot recognize a bare name, so free text that a person typed is
+  never passed to a log or an analytics event at all — it is declared as
+  personal and sent only where the inventory says it goes. `producers` lists the files that call the door, and CI
   checks that list against the imports.
 - **Every way data comes in is a collection point.** `collection_points`
   lists each form, import, API endpoint and inbound channel that receives
@@ -1966,7 +1977,17 @@ schema. One entry per entity that holds personal data:
   import that also loads an RFC collect different data for different
   purposes, and each gets its own simplified notice. A personal field that no
   collection point collects, or a collection point naming a field or purpose
-  the entity does not have, fails CI.
+  the entity does not have, fails CI. The list is checked in **both**
+  directions against the code, using what Modules 3 and 26 already require:
+  every write goes through a backend function, and every function's
+  `function.meta.json` declares the entities it writes. Each collection
+  point names its `handler` (the function, and the action for a router), and
+  CI takes every function or action whose metadata writes an entity with
+  personal fields and fails on one that no collection point names — a new
+  API endpoint or inbound webhook that accepts `Client.phone` cannot ride on
+  the entry an existing form already has. A handler that receives personal
+  data from outside the app (a webhook, an inbound WhatsApp message) is a
+  collection point like any form.
 - The notices, the ARCO path and deletion are **generated** from this file —
   `entities`, `stores`, `recipients` and `collection_points` — so a message
   body sent to an LLM cannot be in the app and missing from the notice.
@@ -2195,7 +2216,7 @@ Each module's proof is a thing you can run and read.
 | 25 signup finishes | a new email+password user can activate their account | `grep -rn verifyOtp src/` reachable from Register **and** Login, `resendOtp` called; then live with a throwaway `+` address: register, skip the code, log in — the code field appears, the code lands you in the app |
 | 26 function metadata | every function says what it is for, and nothing is deployed that nothing calls | `npm run lint` green with the metadata check; `base44 functions list` equals the directories with `function.meta.json`; every `cron:` trigger matches an **active** workflow in `GET /api/apps/{id}/workflows` |
 | 27 `mario_style` (optional) | if adopted: the app has the style and celebrates only finishing | `src/styles/mario_style.css` and `src/lib/celebrate.js` byte-identical to `shared/mario_style/` (`cmp`); every `celebrate(` call sits after an awaited write, outside `catch`; layout scanner **and** screenshots clean at 320/390/834/1440 in light and dark on the **deployed** bundle. N/A for apps that did not adopt it |
-| 28 personal data | the notice describes the deployed app, and a request reaches a person | the inventory check green in CI against the **deployed** schema (`list_entity_schemas`), not the repo file — every deployed field classified, every recipient id in the registry with a role, every personal field reached by a collection point, `material_hash` current and `notice_version` ahead of `main` whenever it moved; **the served notices equal the generator's output**: regenerate the integral page and every simplified notice from the inventory and diff them against what `acaciaco-site` and the deployed app actually serve, whole text, not field names; lint green on the one-door rule (no raw write to a store outside its module) and the allowlist test green; open each `collection_points` entry in the deployed app and confirm it asks for exactly the fields it declares; submit a public form with the optional box ticked, without an account, and find its `ConsentRecord`; raise an `arco` ticket from a throwaway account and read the folio and due date back in Mission Control; delete a test customer and read back one `DeletionReceipt` for **every** recipient the inventory names for that data — gone from the app and the bodega, a provider acknowledgement where a request was needed, `not_deletable` only where the inventory and the notice already say so; the PR that published the notice names the lawyer who reviewed it |
+| 28 personal data | the notice describes the deployed app, and a request reaches a person | the inventory check green in CI against the **deployed** schema (`list_entity_schemas`), not the repo file — every deployed field classified, every recipient id in the registry with a role, every personal field reached by a collection point and every function that writes personal data named as a handler by one, `material_hash` current and `notice_version` ahead of `main` whenever it moved; **the served notices equal the generator's output**: regenerate the integral page and every simplified notice from the inventory and diff them against what `acaciaco-site` and the deployed app actually serve, whole text, not field names; lint green on the one-door rule (no raw write to a store outside its module) and the allowlist test green; open each `collection_points` entry in the deployed app and confirm it asks for exactly the fields it declares; for **every** `collection_points` entry — each public form, signup, the contact form, each API or inbound handler — submit it once with its consent boxes ticked (without an account where the titular has none) and read back its `ConsentRecord`: the right titular, the current `notice_version`, exactly the purposes accepted; raise an `arco` ticket from a throwaway account and read the folio and due date back in Mission Control; delete a test customer and read back one `DeletionReceipt` for **every** recipient the inventory names for that data — gone from the app and the bodega, a provider acknowledgement where a request was needed, `not_deletable` only where the inventory and the notice already say so; the PR that published the notice names the lawyer who reviewed it |
 
 ---
 

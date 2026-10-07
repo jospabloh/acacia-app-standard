@@ -161,6 +161,7 @@
       "id": "public_order",
       "path": "src/pages/PublicOrder.jsx",
       "kind": "public_form",
+      "handler": "orders#createPublicOrder",
       "filled_by": "the tenant's customer",
       "collects": [
         "Client.name",
@@ -180,6 +181,7 @@
       "id": "client_import",
       "path": "src/pages/Clients.jsx",
       "kind": "import",
+      "handler": "clients#importClients",
       "filled_by": "the tenant's staff",
       "collects": [
         "Client.name",
@@ -196,6 +198,7 @@
       "id": "support_form",
       "path": "src/pages/Support.jsx",
       "kind": "back_office",
+      "handler": "support#submitTicket",
       "filled_by": "the account user",
       "collects": [
         "SupportTicketMessage.body",
@@ -211,6 +214,7 @@
       "id": "signup",
       "path": "src/pages/Register.jsx",
       "kind": "signup",
+      "handler": "auth#register",
       "filled_by": "the account user",
       "collects": [
         "User.full_name",
@@ -238,6 +242,7 @@
           "datum": "ip_address, user_agent",
           "category": "identification",
           "titular": "account_user",
+          "minors": false,
           "acacia_role": "responsable",
           "purposes": [
             {
@@ -276,6 +281,7 @@
           "datum": "user id, ip_address",
           "category": "identification",
           "titular": "account_user",
+          "minors": false,
           "acacia_role": "responsable",
           "purposes": [
             {

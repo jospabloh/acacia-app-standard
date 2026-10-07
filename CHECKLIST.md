@@ -240,11 +240,13 @@ jospabloh/acacia-app-standard. Status:
       whether the titular must accept), on a personal field no collection
       point collects, and on ANY change to the file that did not bump
       `notice_version`. Every form, import and inbound channel is a declared
-      collection point with its own fields and purposes. The six non-entity `stores` (auth and sessions, files,
+      collection point with its own fields, purposes and handler, and every
+      function that writes personal data is the handler of one. The six non-entity `stores` (auth and sessions, files,
       logs, analytics, browser storage, outbound messages) are each declared,
       empty or not, and each is written through ONE module that drops and
-      reports (throws under test) any key the inventory does not list; lint
-      fails on a raw write anywhere else. Every
+      reports (throws under test) any key the inventory does not list and
+      redacts personal-looking values under the keys it does; lint fails on
+      a raw write anywhere else. Every
       datum in a store either carries the same metadata an entity does or is
       a `ref` that states the copy's own provider, retention and deletion. Applies to any app with accounts: the account email counts.
       Per category, ACACIA is either responsable (account, billing, leads,

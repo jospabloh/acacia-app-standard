@@ -204,7 +204,13 @@ jospabloh/acacia-app-standard. Status:
       logout or plain F5 all trigger one). Any manually-set nav UI state
       that isn't route-derived (an
       expanded group, a scroll position) persists across a reload via
-      `sessionStorage`, restored synchronously on mount.
+      `sessionStorage`, restored synchronously on mount. Choosing an item
+      never moves the menu: no component declared inside a render (it
+      remounts the `<nav>` and resets its scroll), the nav keeps `scrollTop`
+      across navigation, and a mobile drawer scrolls its `aria-current`
+      item into view when reopened. Proven by scrolling to the bottom,
+      clicking the last item and reading `scrollTop` (unchanged) plus the
+      active item's visibility.
 
 - [ ] Module 24 — Tenant roles: built-in `admin` held only by platform
       accounts (read `User` live); every non-platform `user_condition` sits

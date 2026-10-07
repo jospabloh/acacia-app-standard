@@ -81,8 +81,10 @@ ones, `--play-hp-total` set to the limit, and `data-tone` set from used/limit:
 ```js
 // ok below 80%, near from 80% until full, full at or over the limit.
 // An unlimited plan (limit not finite) never fills, and draws no bar at all.
+// A limit of 0 means none allowed: that is full, not ok.
 function quotaTone(used, limit) {
-  if (!Number.isFinite(limit) || limit <= 0) return 'ok';
+  if (!Number.isFinite(limit)) return 'ok';
+  if (limit <= 0) return 'full';
   const r = used / limit;
   return r >= 1 ? 'full' : r >= 0.8 ? 'near' : 'ok';
 }

@@ -302,6 +302,20 @@
         "arco_request"
       ],
       "notice": "acacia"
+    },
+    {
+      "id": "card_field",
+      "kind": "form",
+      "path": "src/pages/Billing.jsx",
+      "handler": "hosted:mercado-pago",
+      "filled_by": "titular",
+      "collects": [
+        "store:outbound_messages"
+      ],
+      "purposes": [
+        "billing"
+      ],
+      "notice": "acacia"
     }
   ],
   "stores": {
@@ -479,6 +493,28 @@
           "recipient": "mercado-pago",
           "retention": "La que fija Mercado Pago",
           "deletion": "No puede eliminarse desde la app"
+        },
+        {
+          "keys": [
+            "card_number",
+            "card_expiry",
+            "card_cvv"
+          ],
+          "label": "Los datos de tu tarjeta, que capturas directamente con Mercado Pago",
+          "category": "financial",
+          "titular": "account_user",
+          "minors": false,
+          "acacia_role": "responsable",
+          "purposes": [
+            "billing"
+          ],
+          "recipient": "mercado-pago",
+          "retention": "La que fija Mercado Pago",
+          "deletion": "No puede eliminarse desde la app",
+          "written_by": [
+            "hosted:mercado-pago"
+          ],
+          "read_by": []
         }
       ]
     },

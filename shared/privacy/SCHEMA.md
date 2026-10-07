@@ -56,7 +56,7 @@ the end, on purpose: do not close one by guessing.
 store), `purposes` (ids, each one a purpose of what it collects), `notice`
 (`acacia` \| `tenant`).
 
-`handler` is one of three things, and each is checked against a different
+`handler` is one of four things, and each is checked against a different
 source:
 
 - `function#action` — a function of this app. Checked against that
@@ -80,6 +80,14 @@ source:
   must list the same endpoint with the same data; an `external:` handler the
   owning system does not list fails there.
 
+- `hosted:<recipient id>` — a field or widget the recipient itself serves
+  inside the app's page, such as a payment processor's card field. The data
+  never reaches the app, and it is still a collection point: it `collects`
+  a `store:outbound_messages` item whose `recipient` is that provider and
+  whose `written_by` is this handler, with the provider's retention. It is
+  checked by lint (the provider's widget is mounted only by the page the
+  point names) and by the gate opening that page.
+
 A simplified notice and a `ConsentRecord` exist where `filled_by` is
 `titular` or `representative`. A point filled in by staff or by a system
 serves no optional purpose, and has `"notice_to_titular"`: `attested` or
@@ -102,8 +110,10 @@ Seven fixed keys: `auth_and_sessions`, `files`, `logs`, `analytics`,
     is and whose comes from the field — or
   - data that exists nowhere else — `keys`, `label`, `category`, `titular`,
     `minors`, `acacia_role`, `purposes`, `recipient`, `retention`, `deletion`,
-    and `written_by`: the handlers (`function#action`) that put it there, or
-    `["platform"]`.
+    and `written_by`: the handlers that put it there, or `["platform"]`.
+    When its category is `financial` or `sensitive` it also has `read_by`:
+    the functions and actions that use it, read through the store's module
+    like every write.
 
 An app's own `Session` entity (Module 20) is an entity, not this store;
 `auth_and_sessions` is for what the platform's auth holds.
@@ -129,12 +139,13 @@ An app's own `Session` entity (Module 20) is an entity, not this store;
    `written_by` is the handler of a collection point that collects that
    `store:<key>`, and every point that collects `store:<key>` is named in a
    `written_by` there. `platform` is matched against the fixed set above
-   instead, and an `external:` handler against the owning system's
-   inventory.
+   instead, an `external:` handler against the owning system's inventory,
+   and a `hosted:` handler against where the provider's widget is mounted.
 6. Every function, and on a router every action, whose `acts_on` names a
    purpose with `requires_consent` or `automated_decision`, or a transfer to
-   a recipient with `legal_basis: null`, or that reads a field of category
-   `financial` or `sensitive`, calls the consent helper. That the
+   a recipient with `legal_basis: null`, or that reads data of category
+   `financial` or `sensitive` — an entity field, or store-only data that
+   names it in `read_by` — calls the consent helper. That the
    handler then *obeys* the answer is not something a static check can see;
    the verification gate tests it at runtime, for optional purposes,
    transfers and objections to automated decisions alike.

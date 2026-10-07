@@ -70,6 +70,12 @@ Do them in this order; each step is visible on its own.
    desktop, and the app's layout scanner if it has one — Nunito is wider than
    Inter, so tight button rows at 320px are where it breaks.
 
+**Life bar on a tinted tile.** `--play-track` defaults to the muted colour,
+which is also shadcn's `secondary`. On a `bg-secondary` tile the empty blocks
+vanish and "2 of 15" reads as two blocks. Set `--play-track: hsl(var(--card))`
+on the bar there (Rumbo's `QuotaBar` does). Rumbo's layout scanner did not
+catch this; a screenshot did.
+
 ## When to call `celebrate()`
 
 ```js

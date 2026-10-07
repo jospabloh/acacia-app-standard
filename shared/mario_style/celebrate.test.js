@@ -1,4 +1,4 @@
-// Canonical test for shared/playful/celebrate.js — copy it next to the app's
+// Canonical test for shared/mario_style/celebrate.js — copy it next to the app's
 // copy (e.g. src/lib/__tests__/celebrate.test.js) and fix the import path only.
 // Runs under vitest + jsdom.
 import { afterEach, describe, expect, it, vi } from 'vitest';

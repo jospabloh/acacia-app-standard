@@ -1,7 +1,8 @@
 /**
- * ACACIA portfolio celebration — shared, byte-identical across every app that
- * adopts module 27. Change it in `jospabloh/acacia-app-standard` →
- * `shared/playful/` and copy it out; never edit an app's copy.
+ * ACACIA `mario_style` celebration — part of an OPTIONAL portfolio style
+ * (STANDARD.md §27). Byte-identical in every app that opts into it. Change it
+ * in `jospabloh/acacia-app-standard` → `shared/mario_style/` and copy it out;
+ * never edit an app's copy.
  *
  *   import { celebrate, pop } from '@/lib/celebrate';
  *
@@ -134,7 +135,7 @@ export function celebrate(target) {
   return true;
 }
 
-/** Restartable one-shot bounce on an element (uses `.play-pop` from playful.css). */
+/** Restartable one-shot bounce on an element (uses `.play-pop` from mario_style.css). */
 export function pop(el) {
   if (!el || !el.classList || reducedMotion()) return false;
   el.classList.remove('play-pop');

@@ -232,11 +232,10 @@ Security locks last checked for drift (Module 19): <date> — <deployed vs. repo
       with no callers, no deployed trigger and 7 days of captured logs showing
       no invocation.
 
-- [ ] Module 27 — Visual feel ("juego bonito"): `src/styles/playful.css` and
-      `src/lib/celebrate.js` byte-identical to `shared/playful/`, with the five
-      `--play-*` variables mapped to this app's tokens; `--radius: 1rem` drives
-      every Tailwind radius; Baloo 2 headings + Nunito body; filled buttons and
-      the active nav item carry `play-press`, cards `play-card`; brand colour
-      unchanged. `celebrate()` only after a successful write that finishes
-      something (paid, resolved, logged, created), never on edits. Verified in
-      both themes at 390/834/1440 on the deployed bundle. Rumbo is the reference.
+- [ ] Module 27 — `mario_style` (OPTIONAL — write N/A if this app doesn't use
+      it): `src/styles/mario_style.css` and `src/lib/celebrate.js`
+      byte-identical to `shared/mario_style/`; the five `--play-*` variables
+      mapped to this app's tokens; `--radius: 1rem`; Baloo 2 + Nunito; brand
+      colour unchanged. `celebrate()` only after a successful write that
+      finishes something. Verified with screenshots in both themes at
+      390/834/1440 on the deployed bundle. Guideline: STANDARD.md §27.

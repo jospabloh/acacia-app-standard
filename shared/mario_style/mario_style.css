@@ -1,7 +1,8 @@
 /*
- * ACACIA portfolio "juego bonito" feel — shared, byte-identical across every
- * app that adopts module 27. Change it in `jospabloh/acacia-app-standard` →
- * `shared/playful/` and copy it out; never edit an app's copy.
+ * ACACIA `mario_style` — an OPTIONAL portfolio style (STANDARD.md §27).
+ * Byte-identical in every app that opts into it. Change it in
+ * `jospabloh/acacia-app-standard` → `shared/mario_style/` and copy it out;
+ * never edit an app's copy.
  *
  * This file owns the *shape* of the feel (relief, press, pop). It owns no
  * colour, font or radius of its own: every one of those comes from variables

@@ -1,11 +1,14 @@
-# `shared/playful/` — the "juego bonito" feel (module 27)
+# `shared/mario_style/` — the optional `mario_style` (module 27)
 
-Canonical files for [STANDARD.md §27](../../STANDARD.md#27-visual-feel--juego-bonito).
-Copy them, don't re-implement them, and never edit an app's copy in place.
+`mario_style` is a style **option**: an app adopts it only when the owner asks
+("aplica mario_style a <app>"). The rules for using it (what it is made of, when
+to celebrate, how to verify) live in [STANDARD.md §27](../../STANDARD.md#27-optional-style--mario_style).
+This README covers only the mechanics of copying it in. Copy the files rather
+than re-implementing them, and never edit an app's copy in place.
 
 | File | Copy to (React/Vite app) | Byte-identical? |
 |---|---|---|
-| `playful.css` | `src/styles/playful.css`, imported in `src/main.jsx` **after** `index.css` | yes |
+| `mario_style.css` | `src/styles/mario_style.css`, imported in `src/main.jsx` **after** `index.css` | yes |
 | `celebrate.js` | `src/lib/celebrate.js` | yes |
 | `celebrate.test.js` | `src/lib/__tests__/celebrate.test.js` | yes (fix the import path only if the app has no `@` alias) |
 
@@ -55,7 +58,7 @@ Do them in this order; each step is visible on its own.
    because they are also the relief colour. Semantic colours (success /
    warning / destructive) stay legible **as text** on the background — the
    bright "coin yellow" lives in `--play-confetti`, not in `--warning`.
-4. **Components.** Copy `playful.css`, then in the shadcn primitives:
+4. **Components.** Copy `mario_style.css`, then in the shadcn primitives:
    - `button.jsx` base `rounded-xl font-bold`; `default` → `play-press play-press--primary`,
      `destructive` → `play-press play-press--danger`, `outline` → `border-2 bg-card play-press play-press--neutral`,
      `secondary` → `play-press play-press--neutral`. Drop their `shadow*` classes.
@@ -66,7 +69,7 @@ Do them in this order; each step is visible on its own.
    - KPI tiles → solid icon chip with relief, figure in `font-display`.
 5. **Celebrate.** Copy `celebrate.js` and call it at the app's real "done"
    moments — see the rules below. Copy the test.
-6. **Verify** (module 12's dark-mode rule applies): both themes, phone/tablet/
+6. **Verify** (module 12's dark-mode rule applies; look at screenshots, not just the scanner): both themes, phone/tablet/
    desktop, and the app's layout scanner if it has one — Nunito is wider than
    Inter, so tight button rows at 320px are where it breaks.
 
@@ -76,7 +79,7 @@ vanish and "2 of 15" reads as two blocks. Set `--play-track: hsl(var(--card))`
 on the bar there (Rumbo's `QuotaBar` does). Rumbo's layout scanner did not
 catch this; a screenshot did.
 
-## When to call `celebrate()`
+## When to call `celebrate()` (summary — the rule is in §27)
 
 ```js
 const origin = document.activeElement;   // capture BEFORE the await
@@ -94,7 +97,7 @@ celebrate(origin);                        // after success only, never awaited
 
 ## Vanilla sites (`acaciaco-site`)
 
-`playful.css` works as-is (it has no Tailwind dependency). `celebrate.js` is an
+`mario_style.css` works as-is (it has no Tailwind dependency). `celebrate.js` is an
 ES module; a site without a bundler loads it with `<script type="module">` and
 the same five `--play-*` variables mapped to the site's tokens (`--primary`,
 `--border`, …).

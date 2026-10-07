@@ -75,6 +75,22 @@ sessions (a `passive` — not-currently-primary — device goes stale exactly th
 same way an `active` one does), and wiring it behind the same fail-closed
 cron guard every other scheduled endpoint in the app already uses.
 
+> **Known defect (measured in ArtisKids, 2026-10-07): a Base44 automation
+> never passes this guard.** Base44's scheduler invokes a function with no
+> user and no custom headers, so a guard that demands
+> `Authorization: Bearer <CRON_SECRET>` answers 401 to every scheduled run
+> and the job never reaps anything. A headerless `POST` to ArtisKids'
+> deployed `purgeStaleSessions` returned `401 {"error":"unauthorized"}`, and
+> sessions idle since 2026-09-22 were still `passive` two weeks later. A
+> schedule set up as a Base44 automation alone is not proof the job runs:
+> prove it the way the gate below says, by watching a stale row get revoked.
+> ArtisKids resolved it on 2026-10-07 (owner's decision, artiskids#37) by
+> removing the guard from this one job: it takes no input, returns no data,
+> and only revokes sessions idle past 48h, which `session` already refuses,
+> so an anonymous call can only make that cleanup happen early. A headerless
+> call then returned 200 and revoked the 10 stale rows. Keep the guard on
+> any scheduled job that writes anything else or returns data.
+
 ## Verifying it's live
 
 Per the Verification gates table in `STANDARD.md`: wait past the idle

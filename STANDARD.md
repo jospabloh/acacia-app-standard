@@ -1564,11 +1564,14 @@ Copy it rather than rebuilding from prose.
 - The audit note says which of these ran. "Grep only" is a legitimate
   result; claiming the live flow without running it is not.
 
-**Not yet audited across the portfolio (2026-09-29):** only StockFlow has been
-read for this. Every other app with password signup should be checked in its
-next audit — Rumbo, FlowFin, Puntos+, CtrlHQ, KitchOps, Liuma, CatéqHub, Radar
-and the newer apps. Do not assume they are fine because they share the SDK:
-the SDK provides the calls, not the screen.
+**Audited across the portfolio (2026-10-07, static only):** the code step is
+wired into both Register and Login in CtrlHQ, Radar, KitchOps, Rumbo,
+ArtisKids, FlowFin, CateqHub, Puntos+ and Sommel (each imports
+`VerifyEmailStep` and branches on the unverified-email error), and LIUMA does
+it inside its single `Login.jsx` (`verifyOtp` + `resendOtp`). StockFlow was the
+only app missing it, and is fixed. **Not run:** the live proof with a throwaway
+address in any app — it needs an inbox, and the dev sandbox has none. Treat the
+live check as still owed, one app at a time, and say so in each audit note.
 
 ## 26. Every backend function says what it is for — `function.meta.json`
 

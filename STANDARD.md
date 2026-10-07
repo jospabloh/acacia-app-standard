@@ -2152,9 +2152,12 @@ read only to know, between reads, whether there is a version to ask about.
   none of them. The name and email are evidence of a contract and are kept
   while the tenant exists and for the period the inventory states after it
   closes; then rule 7 reaches them as it reaches any record — the person is
-  removed and the decision stays, with its version, hash and time. The tenant record carries the current state (version, decision,
-  when) for the gate to read, locked like `billing_status` (Module 19). The
-  tenant's admins see the rows under Account. They are personal data of
+  removed and the decision stays, with its version, hash and time. The
+  tenant record carries the current state (version, decision, when) for the
+  gate to read, locked like `billing_status` (Module 19). The row is written
+  first and is the truth: where the tenant record disagrees with the latest
+  row, the row wins and the function repairs the record the next time it
+  runs. The tenant's admins see the rows under Account. They are personal data of
   those admins and are in the inventory (rule 2).
 - **The terms open in a new tab from a link.** `acaciaco-site` forbids
   framing (`frame-ancestors 'self'`), so an iframe of the page is blank.
@@ -2183,20 +2186,24 @@ read only to know, between reads, whether there is a version to ask about.
   account is closed and its data deleted — and that accepting before the
   closure undoes the rejection. Going back is the default button.
 - **A rejection is a cancellation, and the licence lifecycle carries it
-  out.** A confirmed rejection is recorded and **raises a ticket** (Module 8)
-  so that a person at ACACIA calls the client and cancels the renewal — after
-  reading the tenant's state as it is then, because two admins can decide in
-  the same minute and the latest row, not the ticket, is the decision;
+  out.** A confirmed rejection **raises a ticket** (Module 8) and is then
+  recorded, in that order: if the ticket cannot be written nothing is
+  recorded and the admin retries, so no rejection exists that nobody at
+  ACACIA heard of. A person there calls the client and cancels the renewal,
+  after reading the tenant's state as it is then — two admins can decide in
+  the same minute, and the latest row, not the ticket, is the decision.
   Mission Control then moves `billing_status` at the end of the period as it
   does for any cancellation (Module 1). The app itself restricts nothing on
-  a rejection. Closing the account and deleting its data (Module 7, rule 7)
-  is done by a person, never by a timer, and the ticket stays open until the
-  tenant has been told by email that it was done. An acceptance that follows
-  a rejection raises a second ticket, so that the person undoes what they
-  did. **Deciding is the one write a `view_only` or `suspended` tenant is
-  still allowed** (Module 3 refuses every other): the terms promise that
-  accepting before the closure undoes the rejection, and by then the
-  lifecycle has already suspended the account.
+  a rejection. Closing the account (Module 7) is decided by a person, never
+  by a timer counting from the rejection; once it is closed its data is
+  deleted on rule 7's schedule like any closed tenant's, and the ticket
+  stays open until the tenant has been told by email that it was done. An
+  acceptance that follows a rejection raises a second ticket the same way,
+  so that the person undoes what they did. **Deciding is the one write a
+  `view_only` or `suspended` tenant is still allowed** (Module 3 refuses
+  every other): the terms promise that accepting before the closure undoes
+  the rejection, and by then the lifecycle has already suspended the
+  account.
 - **It ships observing.** With enforcement off the gate asks, records, and
   always lets the admin postpone. Enforcement — the end of postponing — is
   turned on per app, on a date written in the app's `CLAUDE.md`, and never

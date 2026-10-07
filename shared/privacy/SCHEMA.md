@@ -50,12 +50,30 @@ the end, on purpose: do not close one by guessing.
 ## `collection_points[]`
 
 `id`, `kind` (`signup` \| `login` \| `form` \| `public_form` \| `import` \|
-`api` \| `inbound_message`), `path`, `handler` (`function#action`, or
-`platform:auth` when the platform's own signup receives the data),
+`api` \| `inbound_message`), `path`, `handler`,
 `filled_by` (`titular` \| `representative` \| `tenant_staff` \| `system`),
 `collects` (`Entity.field`, or `store:<key>` for data that only lands in a
 store), `purposes` (ids, each one a purpose of what it collects), `notice`
 (`acacia` \| `tenant`).
+
+`handler` is one of three things, and each is checked against a different
+source:
+
+- `function#action` — a function of this app. Checked against that
+  function's or action's `ingress` (check 5).
+- `platform:auth` — the platform's own signup and login. Nothing in the app
+  can enumerate what it keeps, so the draft fixes it: an app that uses
+  platform auth declares under `auth_and_sessions` at least the account
+  email, the credential the platform stores (a password hash, or the
+  provider's id for a social login) and the session tokens, each
+  `written_by: ["platform"]`. An inventory without them fails.
+- `external:<system>#<endpoint>` — an endpoint another ACACIA system owns
+  that collects data on this app's behalf, such as Mission Control's public
+  ARCO intake (`external:mission-control#arco-intake`). It is a collection
+  point of this app like any other: what it collects, where it is kept, for
+  how long. It is checked against the owning system's own inventory, which
+  must list the same endpoint with the same data; an `external:` handler the
+  owning system does not list fails there.
 
 A simplified notice and a `ConsentRecord` exist where `filled_by` is
 `titular` or `representative`. A point filled in by staff or by a system
@@ -104,7 +122,9 @@ An app's own `Session` entity (Module 20) is an entity, not this store;
    the request body, so it is matched the other way: every handler named in a
    `written_by` is the handler of a collection point that collects that
    `store:<key>`, and every point that collects `store:<key>` is named in a
-   `written_by` there. `["platform"]` is exempt from both.
+   `written_by` there. `platform` is matched against the fixed set above
+   instead, and an `external:` handler against the owning system's
+   inventory.
 6. Every function, and on a router every action, whose `acts_on` names a
    purpose with `requires_consent` or `automated_decision`, or a transfer to
    a recipient with `legal_basis: null`, or that reads a field of category
@@ -145,7 +165,11 @@ Each of these came out of review and none can be settled without building it.
 - **Staff-entered consent.** `basis: tenant_attestation` is recorded on the
   person; its shape and who may write it are undecided.
 - **Mission Control.** Deleting from the bodega, the `arco` category and the
-  public intake with tenant routing do not exist there yet.
+  public intake with tenant routing do not exist there yet, and neither does
+  an inventory of Mission Control's own, which the `external:` check needs.
+- **What platform auth really keeps.** The fixed set is a floor written from
+  what any password login must hold. The platform's own documentation is the
+  authority, and nobody has read the inventory against it.
 - **Platform-written logs.** Declared as `producers: ["platform"]`; whether
   the platform's log retention is really what the file says has to be read
   from the platform, not asserted.

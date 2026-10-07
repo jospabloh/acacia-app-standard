@@ -22,6 +22,9 @@
     },
     "tenant_customer": {
       "label": "Clientes del negocio"
+    },
+    "arco_requester": {
+      "label": "Quien presenta una solicitud sobre sus datos"
     }
   },
   "purposes": {
@@ -63,6 +66,10 @@
     },
     "record_authorship": {
       "label": "Saber qué cuenta creó o modificó cada registro",
+      "requires_consent": false
+    },
+    "arco_request": {
+      "label": "Atender tu solicitud de derechos ARCO y verificar tu identidad",
       "requires_consent": false
     }
   },
@@ -208,12 +215,14 @@
       "collects": [
         "User.full_name",
         "User.email",
-        "User.phone"
+        "User.phone",
+        "store:auth_and_sessions"
       ],
       "purposes": [
         "provide_service",
         "billing",
-        "product_news"
+        "product_news",
+        "session_security"
       ],
       "notice": "acacia"
     },
@@ -279,11 +288,26 @@
         "support"
       ],
       "notice": "acacia"
+    },
+    {
+      "id": "arco_intake",
+      "kind": "public_form",
+      "path": "control.acaciaco.com.mx/arco",
+      "handler": "external:mission-control#arco-intake",
+      "filled_by": "titular",
+      "collects": [
+        "store:mission_control"
+      ],
+      "purposes": [
+        "arco_request"
+      ],
+      "notice": "acacia"
     }
   ],
   "stores": {
     "auth_and_sessions": {
       "producers": [
+        "platform",
         "functions/session/entry.ts"
       ],
       "non_personal_keys": [
@@ -291,6 +315,52 @@
         "last_seen"
       ],
       "holds": [
+        {
+          "ref": "User.email",
+          "key": "email",
+          "recipient": "base44",
+          "retention": "Mientras exista tu cuenta",
+          "deletion": "Se elimina al borrar la cuenta"
+        },
+        {
+          "keys": [
+            "password_hash"
+          ],
+          "label": "Tu contraseña, cifrada",
+          "category": "credentials",
+          "titular": "account_user",
+          "minors": false,
+          "acacia_role": "responsable",
+          "purposes": [
+            "provide_service"
+          ],
+          "recipient": "base44",
+          "retention": "Mientras exista tu cuenta",
+          "deletion": "Se elimina al borrar la cuenta",
+          "written_by": [
+            "platform"
+          ]
+        },
+        {
+          "keys": [
+            "access_token",
+            "refresh_token"
+          ],
+          "label": "Los identificadores de tu sesión",
+          "category": "credentials",
+          "titular": "account_user",
+          "minors": false,
+          "acacia_role": "responsable",
+          "purposes": [
+            "session_security"
+          ],
+          "recipient": "base44",
+          "retention": "Hasta que cierras sesión o expiran",
+          "deletion": "Se eliminan al cerrar sesión",
+          "written_by": [
+            "platform"
+          ]
+        },
         {
           "keys": [
             "ip_address",
@@ -434,6 +504,27 @@
           "recipient": "mission-control",
           "retention": "Mientras exista la solicitud",
           "deletion": "Se solicita por el puente y se confirma"
+        },
+        {
+          "keys": [
+            "requester_name",
+            "requester_contact",
+            "identity_document"
+          ],
+          "label": "Tu nombre, un medio de contacto y el documento con que acreditas tu identidad",
+          "category": "identification",
+          "titular": "arco_requester",
+          "minors": false,
+          "acacia_role": "responsable",
+          "purposes": [
+            "arco_request"
+          ],
+          "recipient": "mission-control",
+          "retention": "Hasta resolver la solicitud y el plazo para inconformarte",
+          "deletion": "Se elimina el documento al cerrar ese plazo",
+          "written_by": [
+            "external:mission-control#arco-intake"
+          ]
         }
       ]
     }

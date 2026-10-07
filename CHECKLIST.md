@@ -240,7 +240,8 @@ jospabloh/acacia-app-standard. Status:
       personal: kind, whose (and whether minors), ACACIA's role, uses and
       which need consent, and every place it goes or is kept (the bodega,
       providers, files, logs, sessions, browser) with retention and deletion
-      there. CI fails on an unclassified deployed field. This app's section
+      there. CI fails on an unclassified field, on the PR against the repo's
+      entity files and again against the deployed schema. This app's section
       of the notice says everything the inventory says, and the notice is
       updated BEFORE an app change that alters it ships. ACACIA is
       responsable (account, billing, leads, support) or encargada (what a

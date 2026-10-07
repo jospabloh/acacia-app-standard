@@ -77,7 +77,9 @@ Seven fixed keys: `auth_and_sessions`, `files`, `logs`, `analytics`,
     `recipient`, and the copy's own `retention` and `deletion`; what the datum
     is and whose comes from the field — or
   - data that exists nowhere else — `keys`, `label`, `category`, `titular`,
-    `minors`, `acacia_role`, `purposes`, `recipient`, `retention`, `deletion`.
+    `minors`, `acacia_role`, `purposes`, `recipient`, `retention`, `deletion`,
+    and `written_by`: the handlers (`function#action`) that put it there, or
+    `["platform"]`.
 
 An app's own `Session` entity (Module 20) is an entity, not this store;
 `auth_and_sessions` is for what the platform's auth holds.
@@ -93,11 +95,15 @@ An app's own `Session` entity (Module 20) is an entity, not this store;
    is; a point's purposes are purposes of what it collects.
 4. Every entity under `entities` is closed to client writes in the deployed
    schema.
-5. The set of functions with non-empty `ingress` equals the set of handlers,
-   and each handler's `ingress` equals its point's `collects`
-   (`platform:auth` and `store:` entries excepted — the first is not app
-   code, the second arrives in headers, not in the request body).
-6. Every function whose `acts_on` names a purpose with `requires_consent` or
+5. The set of functions and router actions with non-empty `ingress` equals
+   the set of handlers that collect an entity field, and each one's `ingress`
+   equals the entity fields in its point's `collects` (`platform:auth`
+   excepted: it is not app code). Store-only data arrives in headers, not in
+   the request body, so it is matched the other way: every handler named in a
+   `written_by` is the handler of a collection point that collects that
+   `store:<key>`, and every point that collects `store:<key>` is named in a
+   `written_by` there. `["platform"]` is exempt from both.
+6. Every function, and on a router every action, whose `acts_on` names a purpose with `requires_consent` or
    `automated_decision`, or a transfer to a recipient with
    `legal_basis: null`, calls the consent helper.
 7. Lint: no raw write to a store outside its module. Test: an undeclared key

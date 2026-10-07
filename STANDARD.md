@@ -1631,6 +1631,11 @@ cap (only `entry.*` does). CI fails without it.
 - `acts_on` (required by Module 28): the purposes the function acts on and
   the third-party transfers it makes, by the ids the app's privacy inventory
   declares; `[]` when none.
+- **On a router, `ingress` and `acts_on` belong to each action, not to the
+  function.** They sit next to that action's `purpose` and `callers`, each
+  action has its own request schema, and every check built on them runs per
+  action: one action that asks for consent does not cover a sibling that
+  sends the same message without asking.
 - Routers (Module 11) list every `action` from `handlers/index.ts` under
   `actions`, each with its own `purpose` and `callers`.
 
@@ -1823,9 +1828,12 @@ app. Seven things have to be true of it, whatever its exact shape:
      collecting by calling the entity directly.
    - *Each function says what personal data it receives.* `function.meta.json`
      (Module 26) carries `ingress`, derived from the function's request
-     schema, which rejects keys it does not declare. A function with a
-     non-empty `ingress` is the handler of a collection point that lists the
-     same data, and the reverse. A cron that flips `Client.active` receives
+     schema, which rejects keys it does not declare. A function — or, on a
+     router, each action — with a non-empty `ingress` is the handler of a
+     collection point that lists the same data, and the reverse. Data a
+     handler takes from the request's headers and keeps (an IP address in a
+     session) is declared where it is kept, with the handler that writes it,
+     and that handler is a collection point for it too. A cron that flips `Client.active` receives
      nothing and is not one.
    - *Each store has one door.* Every write to a log, to browser storage, to
      analytics, to an outbound provider goes through one module per store, and
@@ -1976,8 +1984,9 @@ what the person chose.
   purpose or a transfer the answer with no record is **no**. For an automated
   decision it is **yes** until the person objects, and the objection is a
   recorded `declined`. Each function lists what it acts on in
-  `function.meta.json` (`acts_on`, Module 26), and CI fails on one that lists
-  such a purpose and never calls the helper. The campaign that messages every
+  `function.meta.json` (`acts_on`, Module 26; per action on a router), and CI
+  fails on a function or action that lists such a purpose and whose own
+  handler never calls the helper. The campaign that messages every
   client regardless of the box is the bug this exists to stop.
 - **Revoking writes a new record** and takes effect on the next call, not at
   the next deploy. An account user does it under Account. Someone with no

@@ -1824,6 +1824,19 @@ schema. One entry per entity that holds personal data:
     "Product": ["name", "sku", "price", "stock"],
     "Warehouse": ["name", "active"]
   },
+  "collection_points": [
+    { "id": "public_order", "path": "src/pages/PublicOrder.jsx", "kind": "public_form",
+      "filled_by": "the tenant's customer", "collects": ["Client.name", "Client.phone"],
+      "purposes": ["fulfil_orders", "marketing_whatsapp"], "notice": "tenant",
+      "consent_boxes": ["marketing_whatsapp", "transfer:insurer-x"] },
+    { "id": "client_import", "path": "src/pages/Clients.jsx", "kind": "import",
+      "filled_by": "the tenant's staff", "collects": ["Client.name", "Client.phone", "Client.rfc"],
+      "purposes": ["fulfil_orders"], "notice": "tenant", "consent_boxes": [] },
+    { "id": "support_form", "path": "src/pages/Support.jsx", "kind": "back_office",
+      "filled_by": "the account user",
+      "collects": ["SupportTicketMessage.body", "SupportTicketMessage.attachments"],
+      "purposes": ["support"], "notice": "acacia", "consent_boxes": [] }
+  ],
   "stores": {
     "auth_and_sessions": {
       "producers": ["functions/session/entry.ts"],
@@ -1903,16 +1916,15 @@ schema. One entry per entity that holds personal data:
   CI red until someone moves the entity or classifies the field. Platform
   bookkeeping fields (`id`, `created_date`, `updated_date`) are exempt;
   `created_by` is not — it is a user's email.
-- **A material change forces a new `notice_version`.** `material_hash` is a
-  hash CI computes over the parts of the file a titular would care about:
-  every purpose and its `requires_consent`, every recipient with its role and
-  legal basis,
-  every field's category, every `titular`, `minors` and `acacia_role`, and
-  the same keys inside `stores`. If the computed hash differs from the stored
-  one, CI fails until the hash is updated **and** `notice_version` is
-  different from the one on `main`. Rule 4 keys everything on that version,
-  so a new purpose or recipient cannot reach production under an old one and
-  slip past the people who accepted something else.
+- **Any change to this file forces a new `notice_version`.** `material_hash`
+  is a hash CI computes over the **whole file** except the two keys
+  `material_hash` and `notice_version`. Everything in the inventory drives
+  either the notice or someone's rights — a recipient's purpose, a copy's
+  retention, an `automated_decision` flag — so there is no list of "material"
+  keys to keep complete. If the computed hash differs from the stored one, CI
+  fails until the hash is updated **and** `notice_version` is different from
+  the one on `main`. Rule 4 keys everything on that version, so nothing
+  reaches production under a version people accepted for something else.
 - **Not all personal data lives in an entity.** `stores` covers the rest, and
   its six keys are fixed: `auth_and_sessions`, `files` (uploads and object
   storage), `logs` (function and request logs), `analytics`, `browser_storage`
@@ -1931,20 +1943,33 @@ schema. One entry per entity that holds personal data:
   deleting `Client.phone` in the app does not delete the message Meta already
   holds. Where the provider's copy cannot be deleted on request, the inventory
   says exactly that and so does the notice. A bare string fails CI.
-- **Every writer to a store is listed.** `producers` names each file that
-  writes to that store, and CI finds them itself instead of trusting the
-  list: it scans for the calls that write there — logger and `console.*` calls
-  in backend functions for `logs`, upload calls for `files`, `localStorage`,
-  `sessionStorage` and `document.cookie` for `browser_storage`, the analytics
-  SDK for `analytics`, integration and outbound `fetch` calls for
-  `outbound_messages`, session writes for `auth_and_sessions` — and fails on
-  a call site in a file `producers` does not name, and on a named file with no
-  such call. A second function that starts logging an email address therefore
-  turns CI red until someone adds it and describes what it writes. This is
-  Module 26's declared-callers check, pointed at data instead of functions.
-- The notice, the ARCO path and deletion are generated from `entities` **and**
-  `stores`, so a message body sent to an LLM cannot be in the app and missing
-  from the notice.
+- **Each store has one door, and the door checks the payload.** Every write
+  to a store goes through a single module per store — one logger, one
+  uploader, one browser-storage helper, one analytics helper, one sender per
+  outbound provider — and lint fails on the raw call anywhere else
+  (`console.*` in a backend function, `localStorage`, `document.cookie`, a
+  provider SDK or its URL in a `fetch`). The module takes an allowlist
+  generated from this file: the keys that store `holds`. A key outside the
+  allowlist is dropped and reported in production and **throws under test**,
+  so an error branch that starts logging an email address fails the test
+  suite at that call site, whichever file it is in and however many other
+  writes the file has. `producers` lists the files that call the door, and CI
+  checks that list against the imports.
+- **Every way data comes in is a collection point.** `collection_points`
+  lists each form, import, API endpoint and inbound channel that receives
+  personal data: its `id`, where it lives (`path`), its `kind` (`signup`,
+  `public_form`, `back_office`, `import`, `api`, `inbound_message`), who
+  fills it in, exactly which fields it `collects` (`Entity.field`), the
+  purpose ids it serves, whose notice it shows (`acacia` or `tenant`) and the
+  consent boxes on it. Two forms that create the same entity are two entries:
+  a public order page that asks for a name and a phone and a back-office
+  import that also loads an RFC collect different data for different
+  purposes, and each gets its own simplified notice. A personal field that no
+  collection point collects, or a collection point naming a field or purpose
+  the entity does not have, fails CI.
+- The notices, the ARCO path and deletion are **generated** from this file —
+  `entities`, `stores`, `recipients` and `collection_points` — so a message
+  body sent to an LLM cannot be in the app and missing from the notice.
 
 ### 2. Decide who is the *responsable* for each category, before writing a word
 
@@ -1993,6 +2018,16 @@ lawyer writes it, that is why.
 - **Simplificado** — at *every* point of electronic collection (signup, contact
   form, support form, public order or pass page): items I–IV in a few lines and
   a link to the integral page (art. 16 II). A footer link alone is not this.
+  One per entry in `collection_points`, naming the fields and purposes of
+  that form and no others.
+- **Both forms are generated, never hand-edited.** A script in the app repo
+  turns the inventory plus a small file of fixed text (identity, address,
+  ARCO procedure, the lawyer's wording) into the integral page and every
+  simplified notice. The lawyer reviews the generator's output and the fixed
+  text; after that the published notice is whatever the generator produces
+  from the current inventory. This is what lets the gate compare the whole
+  notice — purposes, recipients, consent boxes, automated decisions,
+  retention — and not a list of field names.
 - Linked from the login page (Module 10), signup, the About screen
   (Module 21), and the app's `apps/` page (Module 9).
 - Cite the law by name and DOF date. **Do not cite article numbers in the
@@ -2084,6 +2119,12 @@ invoice number and the amounts stay. What must be kept by another law (fiscal
 records) is named in the notice with its period. The deletion reaches every
 recipient in the inventory, **including the copy in Mission Control's bodega**
 — a row deleted in the app and still readable in the bodega is not deleted.
+The function that deletes a person writes one `DeletionReceipt` per recipient
+that holds their data (every entry in the entity's `recipients`, every store
+copy that references its fields): the recipient id, what happened —
+`deleted`, `requested` with the provider's acknowledgement, or `not_deletable`
+with the expiry the inventory states — and when. A recipient with no receipt
+is a recipient that still has the data and nobody asked.
 Data about a contractual default is deleted after 72 months (art. 10).
 
 ### 8. Security claims are ones you can prove
@@ -2154,7 +2195,7 @@ Each module's proof is a thing you can run and read.
 | 25 signup finishes | a new email+password user can activate their account | `grep -rn verifyOtp src/` reachable from Register **and** Login, `resendOtp` called; then live with a throwaway `+` address: register, skip the code, log in — the code field appears, the code lands you in the app |
 | 26 function metadata | every function says what it is for, and nothing is deployed that nothing calls | `npm run lint` green with the metadata check; `base44 functions list` equals the directories with `function.meta.json`; every `cron:` trigger matches an **active** workflow in `GET /api/apps/{id}/workflows` |
 | 27 `mario_style` (optional) | if adopted: the app has the style and celebrates only finishing | `src/styles/mario_style.css` and `src/lib/celebrate.js` byte-identical to `shared/mario_style/` (`cmp`); every `celebrate(` call sits after an awaited write, outside `catch`; layout scanner **and** screenshots clean at 320/390/834/1440 in light and dark on the **deployed** bundle. N/A for apps that did not adopt it |
-| 28 personal data | the notice describes the deployed app, and a request reaches a person | the inventory check green in CI against the **deployed** schema (`list_entity_schemas`), not the repo file — every deployed field classified, every recipient id in the registry with a role, `material_hash` current and `notice_version` ahead of `main` whenever it moved; for the six `stores`, the producer scan green (no call site that writes to a store outside the files `producers` names) and then, for **every** producer listed, one artifact it wrote read from the running app and matching what the file says it holds — every logging function's output, every upload path, every outbound integration, the browser's cookies and `localStorage` — not one sample per store; submit a public form with the optional box ticked, without an account, and find its `ConsentRecord`; every field named in the published notice exists in the inventory and the reverse; raise an `arco` ticket from a throwaway account and read the folio and due date back in Mission Control; delete a test customer and confirm the personal fields are gone from the app **and** from the bodega; the PR that published the notice names the lawyer who reviewed it |
+| 28 personal data | the notice describes the deployed app, and a request reaches a person | the inventory check green in CI against the **deployed** schema (`list_entity_schemas`), not the repo file — every deployed field classified, every recipient id in the registry with a role, every personal field reached by a collection point, `material_hash` current and `notice_version` ahead of `main` whenever it moved; **the served notices equal the generator's output**: regenerate the integral page and every simplified notice from the inventory and diff them against what `acaciaco-site` and the deployed app actually serve, whole text, not field names; lint green on the one-door rule (no raw write to a store outside its module) and the allowlist test green; open each `collection_points` entry in the deployed app and confirm it asks for exactly the fields it declares; submit a public form with the optional box ticked, without an account, and find its `ConsentRecord`; raise an `arco` ticket from a throwaway account and read the folio and due date back in Mission Control; delete a test customer and read back one `DeletionReceipt` for **every** recipient the inventory names for that data — gone from the app and the bodega, a provider acknowledgement where a request was needed, `not_deletable` only where the inventory and the notice already say so; the PR that published the notice names the lawyer who reviewed it |
 
 ---
 

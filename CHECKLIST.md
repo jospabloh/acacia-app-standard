@@ -237,11 +237,14 @@ jospabloh/acacia-app-standard. Status:
       Mission Control's bodega, retention, deletion). CI fails on an entity or
       a FIELD not classified as personal or not, on a recipient without a
       declared role (encargado, or third_party with its legal basis and
-      whether the titular must accept), and on a material change that did
-      not bump `notice_version`. The six non-entity `stores` (auth and sessions, files,
+      whether the titular must accept), on a personal field no collection
+      point collects, and on ANY change to the file that did not bump
+      `notice_version`. Every form, import and inbound channel is a declared
+      collection point with its own fields and purposes. The six non-entity `stores` (auth and sessions, files,
       logs, analytics, browser storage, outbound messages) are each declared,
-      empty or not, with every file that writes to it listed as a producer
-      (CI scans for the write calls and fails on an unlisted one). Every
+      empty or not, and each is written through ONE module that drops and
+      reports (throws under test) any key the inventory does not list; lint
+      fails on a raw write anywhere else. Every
       datum in a store either carries the same metadata an entity does or is
       a `ref` that states the copy's own provider, retention and deletion. Applies to any app with accounts: the account email counts.
       Per category, ACACIA is either responsable (account, billing, leads,
@@ -251,13 +254,16 @@ jospabloh/acacia-app-standard. Status:
       (generated from the inventory plus the tenant's identity, address and
       privacy contact). Integral notice at `acaciaco-site/legal/privacidad/<slug>` with
       the six items of art. 15 of the 2025 LFPDPPP plus revocation,
-      sub-processors and retention; simplified notice at EVERY form. Consent
+      sub-processors and retention; simplified notice at EVERY form. Both are
+      GENERATED from the inventory and the served text is diffed against the
+      generator's output. Consent
       recorded by notice version at every collection point, keyed to the
       titular (not only account users); express for financial data; no sensitive
       data by default. A named person or department handles ARCO; a request is
       a Module 8 ticket of category `arco` with folio and due date. Deleting
       a person anonymizes the personal fields, keeps the transaction, and
-      reaches the bodega. No security or compliance claim nobody can prove.
+      leaves a `DeletionReceipt` for every recipient that held the data,
+      the bodega included. No security or compliance claim nobody can prove.
       Reviewed by a lawyer before publishing.
 
 Last audited against the standard: <date> — <what changed / what's still open>

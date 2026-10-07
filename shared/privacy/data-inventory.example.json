@@ -156,6 +156,78 @@
       "active"
     ]
   },
+  "collection_points": [
+    {
+      "id": "public_order",
+      "path": "src/pages/PublicOrder.jsx",
+      "kind": "public_form",
+      "filled_by": "the tenant's customer",
+      "collects": [
+        "Client.name",
+        "Client.phone"
+      ],
+      "purposes": [
+        "fulfil_orders",
+        "marketing_whatsapp"
+      ],
+      "notice": "tenant",
+      "consent_boxes": [
+        "marketing_whatsapp",
+        "transfer:insurer-x"
+      ]
+    },
+    {
+      "id": "client_import",
+      "path": "src/pages/Clients.jsx",
+      "kind": "import",
+      "filled_by": "the tenant's staff",
+      "collects": [
+        "Client.name",
+        "Client.phone",
+        "Client.rfc"
+      ],
+      "purposes": [
+        "fulfil_orders"
+      ],
+      "notice": "tenant",
+      "consent_boxes": []
+    },
+    {
+      "id": "support_form",
+      "path": "src/pages/Support.jsx",
+      "kind": "back_office",
+      "filled_by": "the account user",
+      "collects": [
+        "SupportTicketMessage.body",
+        "SupportTicketMessage.attachments"
+      ],
+      "purposes": [
+        "support"
+      ],
+      "notice": "acacia",
+      "consent_boxes": []
+    },
+    {
+      "id": "signup",
+      "path": "src/pages/Register.jsx",
+      "kind": "signup",
+      "filled_by": "the account user",
+      "collects": [
+        "User.full_name",
+        "User.email",
+        "User.phone"
+      ],
+      "purposes": [
+        "provide_service",
+        "billing",
+        "product_news"
+      ],
+      "notice": "acacia",
+      "consent_boxes": [
+        "product_news"
+      ]
+    }
+  ],
   "stores": {
     "auth_and_sessions": {
       "producers": [

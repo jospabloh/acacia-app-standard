@@ -16,8 +16,10 @@ contributes it back.
    data no schema lists.
 2. For each entity decide `acacia_role`. If any is `encargado`, the tenant
    terms need the data-processing clause (Module 28, rule 2).
-3. Fill the template from the inventory. Every `[…]` is a decision; none may
-   reach production.
+3. Write the generator that fills the template from the inventory, and keep
+   the fixed text (identity, address, ARCO procedure) in its own file. Every
+   `[…]` is a decision; none may reach production, and nobody edits the
+   generated notice by hand.
 4. A lawyer admitted in Mexico reviews the result. Name them in the PR.
 5. Publish, then run Module 28's verification gate.
 

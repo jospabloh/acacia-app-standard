@@ -104,6 +104,9 @@ function tick() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   particles = particles.filter((p) => {
     p.vy += 0.35; p.vx *= 0.98; p.x += p.vx; p.y += p.vy; p.rot += 0.15; p.life -= 1;
+    // Drop it before drawing: a negative globalAlpha is ignored by canvas, so a
+    // particle drawn on its last frame would flash fully opaque.
+    if (p.life <= 0) return false;
     ctx.save();
     ctx.translate(p.x * dpr, p.y * dpr);
     ctx.rotate(p.rot);
@@ -112,7 +115,7 @@ function tick() {
     if (p.round) { ctx.beginPath(); ctx.arc(0, 0, p.size * dpr * 0.6, 0, Math.PI * 2); ctx.fill(); }
     else ctx.fillRect((-p.size * dpr) / 2, (-p.size * dpr) / 4, p.size * dpr, (p.size * dpr) / 2);
     ctx.restore();
-    return p.life > 0;
+    return true;
   });
   if (particles.length) {
     frame = window.requestAnimationFrame(tick);

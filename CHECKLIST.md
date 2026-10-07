@@ -206,24 +206,17 @@ jospabloh/acacia-app-standard. Status:
       expanded group, a scroll position) persists across a reload via
       `sessionStorage`, restored synchronously on mount.
 
-Last audited against the standard: <date> — <what changed / what's still open>
-Last multi-tenant isolation audit: <date> — <scope, findings, what's unverified>
-Secrets last read back: <date> — <which ones, and how each was proven>
-Security locks last checked for drift (Module 19): <date> — <deployed vs. repo, any found open>
 - [ ] Module 24 — Tenant roles: built-in `admin` held only by platform
       accounts (read `User` live); every non-platform `user_condition` sits
       inside an `$and` with the tenant match; signup/role-change code never
       writes `role: 'admin'`; `check-tenant-roles.mjs` from
       `shared/tenant-roles/` runs in CI; signup pings MC's `tenant-pull`.
-```
-
 - [ ] Module 25 — Signup finishes: email+password signup has an in-app code
       step (`verifyOtp`, `resendOtp`, change email) shown after `register()`
       **and** on `/login` when login fails with the unverified-email error;
       after verifying, the user is logged in without retyping. Proven with a
       throwaway `+` address on the deployed app, not only by grep. StockFlow's
       `VerifyEmailStep.jsx` is the reference.
-
 - [ ] Module 26 — Function metadata: every `entry.ts` has a
       `function.meta.json` (purpose, status, triggers, auth, tenant_scoped,
       entities, tests, actions with callers, `remove_when` for one-off or
@@ -231,11 +224,16 @@ Security locks last checked for drift (Module 19): <date> — <deployed vs. repo
       or a `cron:` trigger without an existing workflow. Delete a function only
       with no callers, no deployed trigger and 7 days of captured logs showing
       no invocation.
-
 - [ ] Module 27 — `mario_style` (OPTIONAL — write N/A if this app doesn't use
       it): `src/styles/mario_style.css` and `src/lib/celebrate.js`
-      byte-identical to `shared/mario_style/`; the five `--play-*` variables
+      byte-identical to `shared/mario_style/`; the seven `--play-*` variables
       mapped to this app's tokens; `--radius: 1rem`; Baloo 2 + Nunito; brand
       colour unchanged. `celebrate()` only after a successful write that
       finishes something. Verified with screenshots in both themes at
       390/834/1440 on the deployed bundle. Guideline: STANDARD.md §27.
+
+Last audited against the standard: <date> — <what changed / what's still open>
+Last multi-tenant isolation audit: <date> — <scope, findings, what's unverified>
+Secrets last read back: <date> — <which ones, and how each was proven>
+Security locks last checked for drift (Module 19): <date> — <deployed vs. repo, any found open>
+```

@@ -1683,11 +1683,12 @@ implementation.
 - **Rewards.** Confetti from the button that finished something, plus a short
   overshoot bounce. Nothing else moves on its own.
 - **Quota as a life bar.** Plan limits of 30 or fewer render as one block per
-  unit: green, then amber at 80%, then red when full.
+  unit: green, then amber at 80%, then red when full. The caller sets
+  `data-tone` (`ok` / `near` / `full`) on the bar; the CSS only colours it.
 
 **Canonical files.** `mario_style.css` (relief, press, pop, life bar) and
 `celebrate.js` (zero-dependency confetti) plus its test. Copy them byte for
-byte. They own no colour, font or radius: each app maps five `--play-*`
+byte. They own no colour, font or radius: each app maps seven `--play-*`
 variables to its own tokens by live reference, so a tenant brand colour applied
 at runtime reaches the relief without code. The class prefix stays `play-`.
 Step-by-step adoption is in [`shared/mario_style/README.md`](shared/mario_style/README.md).
@@ -1822,7 +1823,7 @@ Each module's proof is a thing you can run and read.
     (Module 26), and wire the metadata check into `npm run lint`.
 23. Decide whether the app uses `mario_style` (Module 27, optional). If yes,
     start from it before the first screen is built: copy
-    [`shared/mario_style/`](shared/mario_style/), map the five `--play-*`
+    [`shared/mario_style/`](shared/mario_style/), map the seven `--play-*`
     variables, and set `--radius: 1rem` and the two fonts. Restyling 30
     finished screens later costs far more than starting round.
 24. Copy `CHECKLIST.md` from this repo into the new app's `CLAUDE.md`.

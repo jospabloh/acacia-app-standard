@@ -13,6 +13,9 @@
  *     --play-primary: hsl(var(--primary));      // filled button / active pill
  *     --play-danger:  hsl(var(--destructive));
  *     --play-edge:    hsl(var(--border));       // card + neutral button relief
+ *     --play-track:   hsl(var(--muted));        // empty life-bar blocks
+ *     --play-success: hsl(var(--success));      // life bar, under 80%
+ *     --play-warning: hsl(var(--warning));      // life bar, 80% to full
  *     --play-confetti: #2f6bf2, #ffc53d, #2fbf63, #ff5d5d;  // read by celebrate.js
  *   }
  *
@@ -68,9 +71,15 @@
 @keyframes play-rise   { from { transform: translateY(10px) } to { transform: none } }
 
 /* ── Quota as a "life bar" ────────────────────────────────────────────────
-   One block per unit when the limit is small enough to count at a glance. */
+   One block per unit when the limit is small enough to count at a glance.
+   The caller sets data-tone from used/limit (README: "Life bar"): "ok" below
+   80%, "near" from 80% until full, "full" at or over the limit. Without
+   data-tone the blocks take the primary colour. */
 .play-hp { display: grid; grid-template-columns: repeat(var(--play-hp-total, 10), minmax(0, 1fr)); gap: 3px; }
 .play-hp > span { height: 12px; border-radius: 4px; background: var(--play-track, #e2e8f0); }
+.play-hp[data-tone="ok"]   { --play-hp-fill: var(--play-success, #2fbf63); }
+.play-hp[data-tone="near"] { --play-hp-fill: var(--play-warning, #d99a00); }
+.play-hp[data-tone="full"] { --play-hp-fill: var(--play-danger, #e5484d); }
 .play-hp > span[data-on] {
   background: var(--play-hp-fill, var(--play-primary, #2f6bf2));
   box-shadow: inset 0 -3px 0 color-mix(in srgb, var(--play-hp-fill, var(--play-primary, #2f6bf2)) 70%, #000);

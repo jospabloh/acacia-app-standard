@@ -26,12 +26,14 @@ type and corner radius stay the app's own, through its existing tokens:
   --play-danger:  hsl(var(--destructive));
   --play-edge:    hsl(var(--border));       /* card + neutral button relief */
   --play-track:   hsl(var(--muted));        /* empty quota blocks */
+  --play-success: hsl(var(--success));      /* life bar under 80% */
+  --play-warning: hsl(var(--warning));      /* life bar 80% to full */
   --play-confetti: hsl(var(--primary)), #ffc53d, #2fbf63, #ff5d5d;
 }
 ```
 
 An app whose tokens are not shadcn-shaped (Mission Control's `paper-card` /
-`ink`) maps the same five variables to its own names. That is the whole
+`ink`) maps the same seven variables to its own names. That is the whole
 per-app surface.
 
 ## Adoption steps for a shadcn/Tailwind Base44 app
@@ -73,6 +75,23 @@ Do them in this order; each step is visible on its own.
    desktop, and the app's layout scanner if it has one — Nunito is wider than
    Inter, so tight button rows at 320px are where it breaks.
 
+**Life bar.** One `<span>` per unit inside `.play-hp`, `data-on` on the used
+ones, `--play-hp-total` set to the limit, and `data-tone` set from used/limit:
+
+```js
+// ok below 80%, near from 80% until full, full at or over the limit.
+// An unlimited plan (limit not finite) never fills, and draws no bar at all.
+function quotaTone(used, limit) {
+  if (!Number.isFinite(limit) || limit <= 0) return 'ok';
+  const r = used / limit;
+  return r >= 1 ? 'full' : r >= 0.8 ? 'near' : 'ok';
+}
+```
+
+Use blocks only up to ~30 units; above that, draw one continuous bar in the
+same tone colours. Rumbo's `QuotaBar` + `quotaTone()` (`src/lib/plans.js`, with
+tests) is the reference.
+
 **Life bar on a tinted tile.** `--play-track` defaults to the muted colour,
 which is also shadcn's `secondary`. On a `bg-secondary` tile the empty blocks
 vanish and "2 of 15" reads as two blocks. Set `--play-track: hsl(var(--card))`
@@ -99,5 +118,5 @@ celebrate(origin);                        // after success only, never awaited
 
 `mario_style.css` works as-is (it has no Tailwind dependency). `celebrate.js` is an
 ES module; a site without a bundler loads it with `<script type="module">` and
-the same five `--play-*` variables mapped to the site's tokens (`--primary`,
+the same seven `--play-*` variables mapped to the site's tokens (`--primary`,
 `--border`, …).

@@ -233,16 +233,20 @@ Security locks last checked for drift (Module 19): <date> — <deployed vs. repo
       no invocation.
 
 - [ ] Module 27 — Personal data: `privacy/data-inventory.json` lists every
-      entity that holds a person's data (category, titular, ACACIA's role,
-      purposes with `requires_consent`, recipients including Mission Control's
-      bodega, retention, deletion) and CI fails on an entity missing from it.
+      entity that holds a person's data (category, titular, whether minors,
+      ACACIA's role, purposes with `requires_consent`, recipients including
+      Mission Control's bodega, retention, deletion) and CI fails on an entity
+      missing from it. The six non-entity `stores` (auth and sessions, files,
+      logs, analytics, browser storage, outbound messages) are each declared,
+      empty or not. Applies to any app with accounts: the account email counts.
       Per category, ACACIA is either responsable (account, billing, leads,
       support) or encargada (what a tenant loads about its own people) — the
       second needs a data-processing clause and a place for the tenant's own
       notice. Integral notice at `acaciaco-site/legal/privacidad/<slug>` with
       the six items of art. 15 of the 2025 LFPDPPP plus revocation,
       sub-processors and retention; simplified notice at EVERY form. Consent
-      recorded by notice version; express for financial data; no sensitive
+      recorded by notice version at every collection point, keyed to the
+      titular (not only account users); express for financial data; no sensitive
       data by default. A named person or department handles ARCO; a request is
       a Module 8 ticket of category `arco` with folio and due date. Deleting a person anonymizes the personal fields, keeps
       the transaction, and reaches the bodega. No security or compliance claim

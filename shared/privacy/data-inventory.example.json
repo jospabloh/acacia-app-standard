@@ -5,17 +5,37 @@
       "titular": "account_user",
       "acacia_role": "responsable",
       "fields": {
-        "full_name": { "category": "identification" },
-        "email": { "category": "contact" },
-        "phone": { "category": "contact" }
+        "full_name": {
+          "category": "identification"
+        },
+        "email": {
+          "category": "contact"
+        },
+        "phone": {
+          "category": "contact"
+        }
       },
+      "minors": false,
       "purposes": [
-        { "id": "provide_service", "requires_consent": false },
-        { "id": "billing", "requires_consent": false },
-        { "id": "product_news", "requires_consent": true }
+        {
+          "id": "provide_service",
+          "requires_consent": false
+        },
+        {
+          "id": "billing",
+          "requires_consent": false
+        },
+        {
+          "id": "product_news",
+          "requires_consent": true
+        }
       ],
       "source": "entered_by_titular",
-      "recipients": ["base44", "mission-control-bodega", "mercado-pago"],
+      "recipients": [
+        "base44",
+        "mission-control-bodega",
+        "mercado-pago"
+      ],
       "retention": "while the account exists",
       "deletion": "Module 7 delete account"
     },
@@ -23,19 +43,77 @@
       "titular": "tenant_customer",
       "acacia_role": "encargado",
       "fields": {
-        "name": { "category": "identification" },
-        "phone": { "category": "contact" },
-        "rfc": { "category": "fiscal" }
+        "name": {
+          "category": "identification"
+        },
+        "phone": {
+          "category": "contact"
+        },
+        "rfc": {
+          "category": "fiscal"
+        }
       },
+      "minors": false,
       "purposes": [
-        { "id": "fulfil_orders", "requires_consent": false },
-        { "id": "marketing_whatsapp", "requires_consent": true }
+        {
+          "id": "fulfil_orders",
+          "requires_consent": false
+        },
+        {
+          "id": "marketing_whatsapp",
+          "requires_consent": true
+        }
       ],
       "source": "entered_by_tenant",
-      "recipients": ["base44", "mission-control-bodega", "meta-whatsapp"],
+      "recipients": [
+        "base44",
+        "mission-control-bodega",
+        "meta-whatsapp"
+      ],
       "retention": "while the tenant is active; fiscal fields for as long as tax law requires",
       "deletion": "anonymize name/phone/rfc, keep the transaction rows"
     }
   },
-  "no_personal_data": ["Product", "Warehouse"]
+  "no_personal_data": [
+    "Product",
+    "Warehouse"
+  ],
+  "stores": {
+    "auth_and_sessions": {
+      "holds": [
+        "email",
+        "ip_address",
+        "user_agent"
+      ],
+      "retention": "revoked after 48h idle (Module 20)"
+    },
+    "files": {
+      "holds": [
+        "ticket attachments"
+      ],
+      "retention": "with the ticket"
+    },
+    "logs": {
+      "holds": [
+        "user id",
+        "ip_address"
+      ],
+      "retention": "platform default, about 13 hours"
+    },
+    "analytics": {
+      "holds": []
+    },
+    "browser_storage": {
+      "holds": [
+        "theme preference"
+      ]
+    },
+    "outbound_messages": {
+      "holds": [
+        "recipient email",
+        "message body"
+      ],
+      "retention": "provider default"
+    }
+  }
 }

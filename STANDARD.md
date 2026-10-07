@@ -1695,10 +1695,11 @@ a working assumption. This is an engineering contract, not legal advice: **a
 lawyer admitted in Mexico reviews each notice before it is published**, and
 that review is a line in the PR, not an assumption.
 
-**Scope.** Any app that stores a datum about an identifiable natural person
-beyond the signed-in account's own email. In practice that is every app in the
-portfolio: a customer's phone in StockFlow, a family member in FlowFin, a
-loyalty member in Puntos+. Rules 5 and 6 add obligations when the data is
+**Scope.** Any app that stores a datum about an identifiable natural person.
+The signed-in account's own email is such a datum, so an app with accounts is
+in scope even if it stores nothing else. Most apps store far more: a
+customer's phone in StockFlow, a family member in FlowFin, a loyalty member in
+Puntos+. Rules 5 and 6 add obligations when the data is
 financial, sensitive, about minors, or entered by someone other than the
 person it describes.
 
@@ -1719,6 +1720,7 @@ schema. One entry per entity that holds personal data:
         "phone": { "category": "contact" },
         "rfc":   { "category": "fiscal" }
       },
+      "minors": false,
       "purposes": [
         { "id": "fulfil_orders", "requires_consent": false },
         { "id": "marketing_whatsapp", "requires_consent": true }
@@ -1729,13 +1731,24 @@ schema. One entry per entity that holds personal data:
       "deletion": "anonymize name/phone/rfc, keep the transaction rows"
     }
   },
-  "no_personal_data": ["Product", "Warehouse"]
+  "no_personal_data": ["Product", "Warehouse"],
+  "stores": {
+    "auth_and_sessions": { "holds": ["email", "ip_address", "user_agent"], "retention": "revoked after 48h idle (Module 20)" },
+    "files": { "holds": ["ticket attachments"], "retention": "with the ticket" },
+    "logs": { "holds": ["user id", "ip_address"], "retention": "platform default, about 13 hours" },
+    "analytics": { "holds": [] },
+    "browser_storage": { "holds": ["theme preference"] },
+    "outbound_messages": { "holds": ["recipient email", "message body"], "retention": "provider default" }
+  }
 }
 ```
 
 - `category`: `identification` | `contact` | `fiscal` | `financial` |
-  `location` | `sensitive` | `minor` | `credentials`. `financial` and
-  `sensitive` trigger rule 5.
+  `location` | `sensitive` | `credentials`. `financial` and `sensitive`
+  trigger rule 5. The category says what kind of datum it is, never whose.
+- `minors`: `true` when the titular may be under 18. It is a property of the
+  person, set per entity next to `titular`, so a child's name stays
+  `identification` and still triggers the minors rule.
 - `titular`: whose data it is (`account_user`, `tenant_customer`,
   `tenant_employee`, `visitor`, `lead`, …).
 - `acacia_role`: `responsable` or `encargado` (rule 2).
@@ -1746,9 +1759,16 @@ schema. One entry per entity that holds personal data:
   recipient** (Module 0 keeps a copy of operational data there), and so is any
   LLM provider a feature sends the field to.
 - Every entity in the schema appears either under `entities` or in
-  `no_personal_data`. An entity in neither fails CI. That is the whole guard:
-  a new entity cannot ship without someone deciding whether it holds personal
-  data.
+  `no_personal_data`. An entity in neither fails CI, so a new entity cannot
+  ship without someone deciding whether it holds personal data.
+- **Not all personal data lives in an entity.** `stores` covers the rest, and
+  its six keys are fixed: `auth_and_sessions`, `files` (uploads and object
+  storage), `logs` (function and request logs), `analytics`, `browser_storage`
+  (cookies and `localStorage`) and `outbound_messages` (what the email,
+  WhatsApp or LLM provider keeps). Each key is present with what it `holds`;
+  an empty list is an explicit "nothing", and a missing key fails CI. The
+  schema cannot check these, so the gate does: each one is read from the
+  running app and compared with the file.
 
 ### 2. Decide who is the *responsable* for each category, before writing a word
 
@@ -1807,10 +1827,17 @@ inventory example.
 
 Tacit consent is valid for ordinary data once the notice has been made
 available (art. 7). The app still records *that* it was made available: a
-`ConsentRecord` (user, `notice_version`, timestamp, purposes accepted) written
-at signup by a backend function. When `notice_version` changes in a way that
-adds a purpose, a recipient or a data category, the user sees the change on
-next login and the record is rewritten. Purposes with `requires_consent: true`
+`ConsentRecord` (titular, `notice_version`, timestamp, collection point,
+purposes accepted) written by a backend function **at every point of
+collection, not only at signup**. Most titulares never sign up: a tenant's
+customer on a public order page, a visitor with a pass, a lead on a contact
+form. So the record is keyed to the titular — the user id when there is one,
+otherwise the record the form created (the `Client`, the `Lead`, the pass) —
+and a ticked box on any form leaves a row. When `notice_version` changes in a
+way that adds a purpose, a recipient or a data category, an account user sees
+the change on next login and the record is rewritten; for a titular with no
+login, the new purpose does not apply until they accept it at their next
+contact. Purposes with `requires_consent: true`
 (marketing, anything not needed to deliver the service) are separate,
 unticked, and refusing them never blocks the service.
 
@@ -1831,7 +1858,7 @@ unticked, and refusing them never blocks the service.
   that must says so here, by name, with the purpose. Biometric data is not in
   the law's list; treating it as sensitive is this portfolio's choice.
 - **Minors** (any app aimed at children or families): the adult responsible
-  consents, and the inventory marks the field `minor`. That is portfolio
+  consents, and the inventory marks the entity `"minors": true`. That is portfolio
   policy: the 2025 law says nothing about minors beyond letting a legal
   representative act for the titular (art. 21). Ask the lawyer.
 - **Photographs of official ID, plates, faces, voice**: treat as high risk.
@@ -1943,7 +1970,7 @@ Each module's proof is a thing you can run and read.
 | 24 tenant roles | no tenant role reaches every tenant | only platform accounts hold built-in `admin` in live `User`; `check-tenant-roles.mjs` green in CI; deployed schema matches the checked files |
 | 25 signup finishes | a new email+password user can activate their account | `grep -rn verifyOtp src/` reachable from Register **and** Login, `resendOtp` called; then live with a throwaway `+` address: register, skip the code, log in — the code field appears, the code lands you in the app |
 | 26 function metadata | every function says what it is for, and nothing is deployed that nothing calls | `npm run lint` green with the metadata check; `base44 functions list` equals the directories with `function.meta.json`; every `cron:` trigger matches an **active** workflow in `GET /api/apps/{id}/workflows` |
-| 27 personal data | the notice describes the deployed app, and a request reaches a person | the inventory check green in CI against the **deployed** schema (`list_entity_schemas`), not the repo file; every field named in the published notice exists in the inventory and the reverse; raise an `arco` ticket from a throwaway account and read the folio and due date back in Mission Control; delete a test customer and confirm the personal fields are gone from the app **and** from the bodega; the PR that published the notice names the lawyer who reviewed it |
+| 27 personal data | the notice describes the deployed app, and a request reaches a person | the inventory check green in CI against the **deployed** schema (`list_entity_schemas`), not the repo file; each of the six `stores` read from the running app (cookies and `localStorage` in the browser, one function log, one uploaded file, the provider's message log) and matching the file; submit a public form with the optional box ticked, without an account, and find its `ConsentRecord`; every field named in the published notice exists in the inventory and the reverse; raise an `arco` ticket from a throwaway account and read the folio and due date back in Mission Control; delete a test customer and confirm the personal fields are gone from the app **and** from the bodega; the PR that published the notice names the lawyer who reviewed it |
 
 ---
 

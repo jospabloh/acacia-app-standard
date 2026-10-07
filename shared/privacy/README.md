@@ -12,7 +12,8 @@ contributes it back.
 ## Order of work
 
 1. Write the inventory from the **deployed** schema (`list_entity_schemas`),
-   not from the repo files.
+   not from the repo files. Then fill the six `stores`: they hold personal
+   data no schema lists.
 2. For each entity decide `acacia_role`. If any is `encargado`, the tenant
    terms need the data-processing clause (Module 27, rule 2).
 3. Fill the template from the inventory. Every `[…]` is a decision; none may

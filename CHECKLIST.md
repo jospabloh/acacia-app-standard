@@ -231,44 +231,35 @@ jospabloh/acacia-app-standard. Status:
       colour unchanged. `celebrate()` only after a successful write that
       finishes something. Verified with screenshots in both themes at
       320/390/834/1440 on the deployed bundle. Guideline: STANDARD.md §27.
-- [ ] Module 28 — Personal data: `privacy/data-inventory.json` lists every
-      entity that holds a person's data (category, titular, whether minors,
-      ACACIA's role, purposes with `requires_consent`, recipients including
-      Mission Control's bodega, retention, deletion). CI fails on an entity or
-      a FIELD not classified as personal or not, on a recipient without a
-      declared role (encargado, or third_party with its legal basis and
-      whether the titular must accept), on a personal field no collection
-      point collects, and on ANY change to the file that did not bump
-      `notice_version`. Every form, import and inbound channel is a declared
-      collection point with its own fields, purposes and handler, and every
-      function that writes personal data is the handler of one. The six non-entity `stores` (auth and sessions, files,
-      logs, analytics, browser storage, outbound messages) are each declared,
-      empty or not, and each is written through ONE module that drops and
-      reports (throws under test) any key the inventory does not list and
-      redacts personal-looking values under the keys it does; lint fails on
-      a raw write anywhere else. Every
-      datum in a store either carries the same metadata an entity does or is
-      a `ref` that states the copy's own provider, retention and deletion. Applies to any app with accounts: the account email counts.
-      Per category, ACACIA is either responsable (account, billing, leads,
-      support) or encargada (what a tenant loads about its own people) — the
-      second needs a data-processing clause, and no public form of a tenant
-      is published until the app can show that tenant's complete notice
-      (generated from the inventory plus the tenant's identity, address and
-      privacy contact). Integral notice at `acaciaco-site/legal/privacidad/<slug>` with
-      the six items of art. 15 of the 2025 LFPDPPP plus revocation,
-      sub-processors and retention; simplified notice at EVERY form. Both are
-      GENERATED from the inventory and the served text is diffed against the
-      generator's output. Consent
-      recorded by notice version at every collection point, keyed to the
-      titular (not only account users), and ENFORCED: every function acting
-      on an optional purpose or an acceptance-requiring transfer checks the
-      latest record first, so an unticked box or a revocation stops it; express for financial data; no sensitive
-      data by default. A named person or department handles ARCO; a request is
-      a Module 8 ticket of category `arco` with folio and due date. Deleting
-      a person anonymizes the personal fields, keeps the transaction, and
-      leaves a `DeletionReceipt` for every recipient that held the data,
-      the bodega included. No security or compliance claim nobody can prove.
-      Reviewed by a lawyer before publishing.
+- [ ] Module 28 — Personal data: applies to any app with accounts (the
+      account email counts). `privacy/data-inventory.json` classifies EVERY
+      deployed field as personal or not and describes every personal datum:
+      kind, whose (and whether minors), ACACIA's role, purposes, where it
+      goes and, for each place it is kept, retention and deletion — including
+      sessions, files, logs, analytics, browser storage, what outbound
+      providers keep, and Mission Control's bodega. Every form, import, API
+      and inbound channel is a listed collection point. The file is checked
+      against the app: entities with personal data are closed to client
+      writes in the deployed schema, each function's `ingress` matches a
+      collection point, and each store is written through one module that
+      rejects undeclared keys. Per category ACACIA is responsable (account,
+      billing, leads, support) or encargada (what a tenant loads about its
+      own people); the second needs a data-processing clause, and no public
+      form of a tenant is published without that tenant's complete notice.
+      Integral notice at `acaciaco-site/legal/privacidad/<slug>` and a
+      simplified one at every form the titular fills in, both GENERATED and
+      diffed against what is served; `notice_version` moves when their text
+      does. Consent is recorded per choice at every such form, keyed to the
+      titular, and OBEYED: functions check it before acting on an optional
+      purpose or a third-party transfer. Express consent for financial data;
+      no sensitive data by default. A named person or department handles
+      ARCO; requests are `arco` tickets with folio and due date, with a
+      public intake for people with no account. Deleting a person anonymizes
+      the personal fields, keeps the transaction, and leaves a
+      `DeletionReceipt` for every place the data was kept. No security or
+      compliance claim nobody can prove. Reviewed by a lawyer before
+      publishing. The schema in `shared/privacy/` is a DRAFT; the seven
+      requirements of rule 1 are not.
 
 Last audited against the standard: <date> — <what changed / what's still open>
 Last multi-tenant isolation audit: <date> — <scope, findings, what's unverified>

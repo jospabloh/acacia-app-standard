@@ -1,344 +1,168 @@
 {
-  "notice_version": "2026-10-07",
-  "material_hash": "sha256:<computed by the CI check>",
+  "notice_version": 1,
+  "notice_hash": "sha256:<computed by CI over the generator's output>",
+  "platform_fields": {
+    "created_by": { "ref": "User.email" }
+  },
+  "titulares": {
+    "account_user": { "label": "Titular de la cuenta" },
+    "tenant_customer": { "label": "Clientes del negocio" }
+  },
+  "purposes": {
+    "provide_service": { "label": "Crear tu cuenta y darte el servicio", "requires_consent": false },
+    "billing": { "label": "Cobrar y facturar tu suscripción", "requires_consent": false },
+    "support": { "label": "Atender tus solicitudes de soporte", "requires_consent": false },
+    "session_security": { "label": "Proteger tu cuenta y tus sesiones", "requires_consent": false },
+    "debugging": { "label": "Diagnosticar fallas del servicio", "requires_consent": false },
+    "product_news": { "label": "Enviarte novedades de ACACIA", "requires_consent": true },
+    "fulfil_orders": { "label": "Surtir y entregar tus pedidos", "requires_consent": false },
+    "marketing_whatsapp": { "label": "Enviarte promociones por WhatsApp", "requires_consent": true },
+    "insurance_quote": { "label": "Cotizarte un seguro para tu compra", "requires_consent": true }
+  },
   "recipients": {
-    "base44": {
-      "role": "encargado",
-      "purpose": "hosting and database",
-      "country": "US"
-    },
-    "mission-control-bodega": {
-      "role": "encargado",
-      "purpose": "ACACIA's own panel (Supabase)",
-      "country": "US"
-    },
-    "mercado-pago": {
-      "role": "encargado",
-      "purpose": "collects the subscription payment",
-      "country": "MX"
-    },
-    "meta-whatsapp": {
-      "role": "encargado",
-      "purpose": "delivers messages the tenant sends",
-      "country": "US"
-    },
-    "insurer-x": {
-      "role": "third_party",
-      "purpose": "quotes a policy for the customer",
-      "country": "MX",
-      "legal_basis": null,
-      "requires_acceptance": true
-    }
+    "base44": { "label": "Base44", "role": "encargado", "does": "Hospeda la app y su base de datos", "country": "US" },
+    "mission-control": { "label": "Panel interno de ACACIA", "role": "encargado", "does": "Concentra licencias y soporte", "country": "US" },
+    "mercado-pago": { "label": "Mercado Pago", "role": "encargado", "does": "Cobra la suscripción", "country": "MX" },
+    "meta-whatsapp": { "label": "WhatsApp (Meta)", "role": "encargado", "does": "Entrega los mensajes que envía el negocio", "country": "US" },
+    "insurer-x": { "label": "Aseguradora X", "role": "third_party", "does": "Cotiza un seguro", "country": "MX", "legal_basis": null }
   },
   "entities": {
     "User": {
       "titular": "account_user",
+      "minors": false,
       "acacia_role": "responsable",
       "fields": {
-        "full_name": {
-          "category": "identification"
-        },
-        "email": {
-          "category": "contact"
-        },
-        "phone": {
-          "category": "contact"
-        }
+        "full_name": { "label": "Nombre", "category": "identification" },
+        "email": { "label": "Correo", "category": "contact" },
+        "phone": { "label": "Teléfono", "category": "contact" }
       },
-      "non_personal_fields": [
-        "role",
-        "tenant_id"
-      ],
-      "minors": false,
-      "purposes": [
-        {
-          "id": "provide_service",
-          "requires_consent": false
-        },
-        {
-          "id": "billing",
-          "requires_consent": false
-        },
-        {
-          "id": "product_news",
-          "requires_consent": true
-        }
-      ],
-      "source": "entered_by_titular",
-      "recipients": [
-        "base44",
-        "mission-control-bodega",
-        "mercado-pago"
-      ],
-      "retention": "while the account exists",
-      "deletion": "Module 7 delete account"
+      "non_personal_fields": ["role", "tenant_id"],
+      "purposes": ["provide_service", "billing", "product_news"],
+      "retention": "Mientras exista tu cuenta",
+      "deletion": "Se elimina al borrar la cuenta"
     },
     "Client": {
       "titular": "tenant_customer",
+      "minors": false,
       "acacia_role": "encargado",
       "fields": {
-        "name": {
-          "category": "identification"
-        },
-        "phone": {
-          "category": "contact"
-        },
-        "rfc": {
-          "category": "fiscal"
-        }
+        "name": { "label": "Nombre", "category": "identification" },
+        "phone": { "label": "Teléfono", "category": "contact" },
+        "rfc": { "label": "RFC", "category": "fiscal" }
       },
-      "non_personal_fields": [
-        "price_list_id",
-        "credit_days",
-        "active"
-      ],
-      "minors": false,
-      "purposes": [
-        {
-          "id": "fulfil_orders",
-          "requires_consent": false
-        },
-        {
-          "id": "marketing_whatsapp",
-          "requires_consent": true
-        }
-      ],
-      "source": "entered_by_tenant",
-      "recipients": [
-        "base44",
-        "mission-control-bodega",
-        "meta-whatsapp",
-        "insurer-x"
-      ],
-      "retention": "while the tenant is active; fiscal fields for as long as tax law requires",
-      "deletion": "anonymize name/phone/rfc, keep the transaction rows"
+      "non_personal_fields": ["price_list_id", "credit_days", "active"],
+      "purposes": ["fulfil_orders", "marketing_whatsapp", "insurance_quote"],
+      "retention": "Mientras el negocio use la app; los datos fiscales, el tiempo que exige la ley",
+      "deletion": "Se vuelven anónimos nombre, teléfono y RFC; se conservan las operaciones"
     },
     "SupportTicketMessage": {
       "titular": "account_user",
+      "minors": false,
       "acacia_role": "responsable",
       "fields": {
-        "body": {
-          "category": "identification"
-        },
-        "attachments": {
-          "category": "identification"
-        }
+        "body": { "label": "Lo que escribes en tu solicitud", "category": "identification" },
+        "attachments": { "label": "Archivos que adjuntas", "category": "identification" }
       },
-      "non_personal_fields": [
-        "ticket_id",
-        "author_role"
-      ],
-      "minors": false,
-      "purposes": [
-        {
-          "id": "support",
-          "requires_consent": false
-        }
-      ],
-      "source": "entered_by_titular",
-      "recipients": [
-        "base44",
-        "mission-control-bodega"
-      ],
-      "retention": "while the account exists",
-      "deletion": "removed with the ticket"
+      "non_personal_fields": ["ticket_id", "author_role"],
+      "purposes": ["support"],
+      "retention": "Mientras exista tu cuenta",
+      "deletion": "Se elimina junto con la solicitud"
     }
   },
   "no_personal_data": {
-    "Product": [
-      "name",
-      "sku",
-      "price",
-      "stock"
-    ],
-    "Warehouse": [
-      "name",
-      "active"
-    ]
+    "Product": ["name", "sku", "price", "stock"],
+    "Warehouse": ["name", "active"]
   },
   "collection_points": [
-    {
-      "id": "public_order",
-      "path": "src/pages/PublicOrder.jsx",
-      "kind": "public_form",
-      "handler": "orders#createPublicOrder",
-      "filled_by": "the tenant's customer",
-      "collects": [
-        "Client.name",
-        "Client.phone"
-      ],
-      "purposes": [
-        "fulfil_orders",
-        "marketing_whatsapp"
-      ],
-      "notice": "tenant",
-      "consent_boxes": [
-        "marketing_whatsapp",
-        "transfer:insurer-x"
-      ]
-    },
-    {
-      "id": "client_import",
-      "path": "src/pages/Clients.jsx",
-      "kind": "import",
-      "handler": "clients#importClients",
-      "filled_by": "the tenant's staff",
-      "collects": [
-        "Client.name",
-        "Client.phone",
-        "Client.rfc"
-      ],
-      "purposes": [
-        "fulfil_orders"
-      ],
-      "notice": "tenant",
-      "consent_boxes": []
-    },
-    {
-      "id": "support_form",
-      "path": "src/pages/Support.jsx",
-      "kind": "back_office",
-      "handler": "support#submitTicket",
-      "filled_by": "the account user",
-      "collects": [
-        "SupportTicketMessage.body",
-        "SupportTicketMessage.attachments"
-      ],
-      "purposes": [
-        "support"
-      ],
-      "notice": "acacia",
-      "consent_boxes": []
-    },
-    {
-      "id": "login",
-      "path": "src/pages/Login.jsx",
-      "kind": "signup",
-      "handler": "session#start",
-      "filled_by": "the account user",
-      "collects": [
-        "store:auth_and_sessions",
-        "store:logs"
-      ],
-      "purposes": [
-        "session_security",
-        "debugging"
-      ],
-      "notice": "acacia",
-      "consent_boxes": []
-    },
-    {
-      "id": "signup",
-      "path": "src/pages/Register.jsx",
-      "kind": "signup",
-      "handler": "auth#register",
-      "filled_by": "the account user",
-      "collects": [
-        "User.full_name",
-        "User.email",
-        "User.phone"
-      ],
-      "purposes": [
-        "provide_service",
-        "billing",
-        "product_news"
-      ],
-      "notice": "acacia",
-      "consent_boxes": [
-        "product_news"
-      ]
-    }
+    { "id": "signup", "kind": "signup", "path": "src/pages/Register.jsx",
+      "handler": "platform:auth", "filled_by": "titular",
+      "collects": ["User.full_name", "User.email", "User.phone"],
+      "purposes": ["provide_service", "billing", "product_news"], "notice": "acacia" },
+    { "id": "login", "kind": "login", "path": "src/pages/Login.jsx",
+      "handler": "session#start", "filled_by": "titular",
+      "collects": ["store:auth_and_sessions"],
+      "purposes": ["session_security"], "notice": "acacia" },
+    { "id": "public_order", "kind": "public_form", "path": "src/pages/PublicOrder.jsx",
+      "handler": "orders#createPublicOrder", "filled_by": "titular",
+      "collects": ["Client.name", "Client.phone"],
+      "purposes": ["fulfil_orders", "marketing_whatsapp", "insurance_quote"], "notice": "tenant" },
+    { "id": "client_import", "kind": "import", "path": "src/pages/Clients.jsx",
+      "handler": "clients#importClients", "filled_by": "tenant_staff",
+      "collects": ["Client.name", "Client.phone", "Client.rfc"],
+      "purposes": ["fulfil_orders"], "notice": "tenant" },
+    { "id": "support_form", "kind": "form", "path": "src/pages/Support.jsx",
+      "handler": "support#submitTicket", "filled_by": "titular",
+      "collects": ["SupportTicketMessage.body", "SupportTicketMessage.attachments"],
+      "purposes": ["support"], "notice": "acacia" }
   ],
   "stores": {
     "auth_and_sessions": {
-      "producers": [
-        "functions/session/entry.ts"
-      ],
+      "producers": ["functions/session/entry.ts"],
+      "non_personal_keys": ["session_id", "last_seen"],
       "holds": [
-        {
-          "datum": "ip_address, user_agent",
-          "category": "identification",
-          "titular": "account_user",
-          "minors": false,
-          "acacia_role": "responsable",
-          "purposes": [
-            {
-              "id": "session_security",
-              "requires_consent": false
-            }
-          ],
-          "recipients": [
-            "base44"
-          ],
-          "retention": "revoked after 48h idle (Module 20)",
-          "deletion": "removed with the session"
-        }
+        { "keys": ["ip_address", "user_agent"], "label": "Dirección IP y navegador",
+          "category": "identification", "titular": "account_user", "minors": false,
+          "acacia_role": "responsable", "purposes": ["session_security"],
+          "recipient": "base44",
+          "retention": "Se revoca tras 48 horas sin actividad",
+          "deletion": "Se elimina con la sesión" }
       ]
     },
     "files": {
-      "producers": [
-        "src/pages/Support.jsx"
-      ],
+      "producers": ["functions/support/entry.ts"],
+      "non_personal_keys": ["content_type", "size"],
       "holds": [
-        {
-          "ref": "SupportTicketMessage.attachments",
-          "provider": "base44",
-          "retention": "with the ticket",
-          "deletion": "file removed when the ticket is"
-        }
+        { "ref": "SupportTicketMessage.attachments", "key": "file", "recipient": "base44",
+          "retention": "Mientras exista la solicitud",
+          "deletion": "Se elimina el archivo junto con la solicitud" }
       ]
     },
     "logs": {
-      "producers": [
-        "functions/session/entry.ts",
-        "functions/quotations/entry.ts"
-      ],
+      "producers": ["platform"],
+      "non_personal_keys": [],
       "holds": [
-        {
-          "datum": "user id, ip_address",
-          "category": "identification",
-          "titular": "account_user",
-          "minors": false,
-          "acacia_role": "responsable",
-          "purposes": [
-            {
-              "id": "debugging",
-              "requires_consent": false
-            }
-          ],
-          "recipients": [
-            "base44"
-          ],
-          "retention": "platform default, about 13 hours",
-          "deletion": "expires; cannot be deleted on request"
-        }
+        { "keys": ["ip_address", "user_agent"], "label": "Dirección IP y navegador en los registros técnicos",
+          "category": "identification", "titular": "account_user", "minors": false,
+          "acacia_role": "responsable", "purposes": ["debugging"],
+          "recipient": "base44",
+          "retention": "Cerca de 13 horas, según la plataforma",
+          "deletion": "Expira sola; no puede eliminarse a solicitud" }
       ]
     },
-    "analytics": {
-      "producers": [],
-      "holds": []
-    },
+    "analytics": { "producers": [], "non_personal_keys": [], "holds": [] },
     "browser_storage": {
-      "producers": [],
+      "producers": ["src/lib/storage.js"],
+      "non_personal_keys": ["theme"],
       "holds": []
     },
     "outbound_messages": {
-      "producers": [
-        "functions/notify/entry.ts"
-      ],
+      "producers": ["functions/notify/entry.ts", "functions/insurance/entry.ts"],
+      "non_personal_keys": ["template_id"],
       "holds": [
-        {
-          "ref": "Client.phone",
-          "provider": "meta-whatsapp",
-          "retention": "kept by the provider under its own policy",
-          "deletion": "cannot be deleted from the app; the notice says so"
-        },
-        {
-          "ref": "Client.name",
-          "provider": "meta-whatsapp",
-          "retention": "kept by the provider under its own policy",
-          "deletion": "cannot be deleted from the app; the notice says so"
-        }
+        { "ref": "Client.phone", "key": "to", "recipient": "meta-whatsapp",
+          "retention": "La que fija WhatsApp",
+          "deletion": "No puede eliminarse desde la app" },
+        { "ref": "Client.name", "key": "template_params.name", "recipient": "meta-whatsapp",
+          "retention": "La que fija WhatsApp",
+          "deletion": "No puede eliminarse desde la app" },
+        { "ref": "Client.name", "key": "quote.customer_name", "recipient": "insurer-x",
+          "retention": "La que fija la aseguradora",
+          "deletion": "Se solicita a la aseguradora" },
+        { "ref": "User.email", "key": "payer.email", "recipient": "mercado-pago",
+          "retention": "La que fija Mercado Pago",
+          "deletion": "No puede eliminarse desde la app" }
+      ]
+    },
+    "mission_control": {
+      "producers": ["functions/acaciaControl/entry.ts"],
+      "non_personal_keys": ["billing_status", "plan"],
+      "holds": [
+        { "ref": "User.email", "key": "owner_email", "recipient": "mission-control",
+          "retention": "Mientras exista la licencia",
+          "deletion": "Se solicita por el puente y se confirma" },
+        { "ref": "SupportTicketMessage.body", "key": "ticket.body", "recipient": "mission-control",
+          "retention": "Mientras exista la solicitud",
+          "deletion": "Se solicita por el puente y se confirma" }
       ]
     }
   }

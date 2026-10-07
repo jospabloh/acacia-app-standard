@@ -61,8 +61,13 @@ source:
 
 - `function#action` — a function of this app. Checked against that
   function's or action's `ingress` (check 5).
-- `platform:auth` — the platform's own signup and login. Nothing in the app
-  can enumerate what it keeps, so the draft fixes it: an app that uses
+- `platform:auth` — the platform's own signup and login. What it *receives*
+  is still the app's doing: Module 10 has the app own its login and signup
+  form and call the platform's `register` and login functions itself, so
+  check 5 reads the arguments the app's page passes to those calls and
+  compares them with the point's `collects`, and the gate opens the deployed
+  form to see that it asks for exactly those. What the platform *keeps*,
+  nothing in the app can enumerate, so the draft fixes it: an app that uses
   platform auth declares under `auth_and_sessions` at least the account
   email, the credential the platform stores (a password hash, or the
   provider's id for a social login) and the session tokens, each
@@ -117,8 +122,9 @@ An app's own `Session` entity (Module 20) is an entity, not this store;
    and with `platform_fields` every row carries a person's email.
 5. The set of functions and router actions with non-empty `ingress` equals
    the set of handlers that collect an entity field, and each one's `ingress`
-   equals the entity fields in its point's `collects` (`platform:auth`
-   excepted: it is not app code). Store-only data arrives in headers, not in
+   equals the entity fields in its point's `collects`. For `platform:auth`
+   the comparison is with the arguments the app's own page passes to the
+   platform's register and login calls. Store-only data arrives in headers, not in
    the request body, so it is matched the other way: every handler named in a
    `written_by` is the handler of a collection point that collects that
    `store:<key>`, and every point that collects `store:<key>` is named in a
@@ -132,8 +138,10 @@ An app's own `Session` entity (Module 20) is an entity, not this store;
    handler then *obeys* the answer is not something a static check can see;
    the verification gate tests it at runtime, for optional purposes,
    transfers and objections to automated decisions alike.
-7. Lint: no raw write to a store outside its module. Test: an undeclared key
-   and a personal-looking value under a non-personal key both throw.
+7. Lint: no raw write to a store outside its module. Test: an undeclared key,
+   a personal-looking value under a non-personal key, and a loose value
+   passed for a key declared as a copy of a field (the module reads the field
+   from the record itself) all throw.
 8. `notice_hash` equals the hash of the generator's output; if it differs
    from `main`, so does `notice_version`.
 9. Every recipient declared holds something.

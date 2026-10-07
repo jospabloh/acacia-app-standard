@@ -1926,9 +1926,19 @@ the 2011 Reglamento does, so if the lawyer writes it, that is why.
   for them, fills in (signup, contact form, support form, public order or pass
   page): items I–IV in a few lines and a link to the integral page
   (art. 16 II), naming the data and purposes of that form and no others. A
-  footer link alone is not this. A back-office import filled in by the
-  tenant's staff shows no notice to anyone who is its subject; the
-  data-processing clause of rule 2 is what covers it.
+  footer link alone is not this.
+- **Data that did not come from the person still owes them a notice.** A
+  back-office form or an import filled in by the tenant's staff shows a
+  notice to nobody it describes, and the data-processing clause of rule 2
+  only governs ACACIA and the tenant. The law makes the responsable give the
+  notice to a titular whose data it did not obtain from them directly
+  (art. 17). So at such a point the tenant either attests, on the record of
+  the import, that these people already have its notice, or the app sends it
+  to each of them at the contact it just received (the link to the tenant's
+  integral notice, by email or WhatsApp) and records that it did. Where
+  neither is possible the tenant is told that the law's compensatory
+  measures are its to arrange; the app does not pretend the notice was
+  given.
 - **Both forms are generated, never hand-edited.** A script in the app repo
   turns the inventory plus one file of fixed text (identity, address, the
   privacy contact, the ARCO procedure, the lawyer's wording) into the integral
@@ -1978,16 +1988,22 @@ what the person chose.
   email — or by a signature, and the record says which. An anonymous public
   form does not collect sensitive data.
 - **A recorded choice that nothing reads is decoration.** Every function that
-  acts on an optional purpose, makes one of those transfers, or runs an
-  automated decision asks one shared helper first —
+  acts on an optional purpose, makes one of those transfers, runs an
+  automated decision, or uses financial or sensitive data that was collected
+  under an express consent asks one shared helper first —
   `hasConsent(titular, purposeOrTransfer)` — which reads server-side the
   latest record that contains a choice for the thing asked. For an optional
-  purpose or a transfer the answer with no record is **no**. For an automated
-  decision it is **yes** until the person objects, and the objection is a
-  recorded `declined`. Each function lists what it acts on in
+  purpose, a transfer or an express consent the answer with no record is
+  **no**. For an automated decision it is **yes** until the person objects,
+  and the objection is a recorded `declined`. Express consent can be revoked
+  like any other (art. 7): the function that bills from a person's financial
+  data stops using it on the next call, the app tells them which part of the
+  service that ends, and what the app may still keep is only what another
+  law obliges it to (rule 7). Each function lists what it acts on in
   `function.meta.json` (`acts_on`, Module 26; per action on a router), and CI
-  fails on a function or action that lists such a purpose and whose own
-  handler never calls the helper. The campaign that messages every
+  fails on a function or action that lists such a purpose, or reads a
+  financial or sensitive field, and whose own handler never calls the
+  helper. The campaign that messages every
   client regardless of the box is the bug this exists to stop.
 - **Revoking writes a new record** and takes effect on the next call, not at
   the next deploy. An account user does it under Account. Someone with no
@@ -2155,7 +2171,7 @@ Each module's proof is a thing you can run and read.
 | 25 signup finishes | a new email+password user can activate their account | `grep -rn verifyOtp src/` reachable from Register **and** Login, `resendOtp` called; then live with a throwaway `+` address: register, skip the code, log in — the code field appears, the code lands you in the app |
 | 26 function metadata | every function says what it is for, and nothing is deployed that nothing calls | `npm run lint` green with the metadata check; `base44 functions list` equals the directories with `function.meta.json`; every `cron:` trigger matches an **active** workflow in `GET /api/apps/{id}/workflows` |
 | 27 `mario_style` (optional) | if adopted: the app has the style and celebrates only finishing | `src/styles/mario_style.css` and `src/lib/celebrate.js` byte-identical to `shared/mario_style/` (`cmp`); every `celebrate(` call sits after an awaited write, outside `catch`; layout scanner **and** screenshots clean at 320/390/834/1440 in light and dark on the **deployed** bundle. N/A for apps that did not adopt it |
-| 28 personal data | the notice describes the deployed app, consent is obeyed, and a request reaches a person | the inventory check green in CI against the **deployed** schema (`list_entity_schemas`), not the repo file: every deployed field classified, and every entity that holds personal data closed to client writes; every function with a non-empty `ingress` is the handler of a collection point listing the same data, and the reverse; **the served notices equal the generator's output** — regenerate the integral page and every simplified notice and diff the whole text against what `acaciaco-site` and the deployed app serve — and the notice version a new `ConsentRecord` carries equals the version printed on the served page; lint green on the one-door rule, and its test writes one undeclared key and one non-personal key carrying an email address and sees both throw; for **every** collection point the titular fills in, exercise its **optional** choices three ways — accept, decline, and accept then revoke — read back the `ConsentRecord` each time (right titular, current version, each choice as made) and confirm every function that acts on that choice skips the person who declined or revoked and still processes the one who accepted; for **every** purpose that decides about a person automatically, record one person's objection and confirm the function no longer applies the decision to them while it still does to others; where the point asks for financial or sensitive data, leave the **required** express consent unticked and confirm the submission is refused, nothing is stored and no record or downstream processing results, and for sensitive data confirm it cannot be given without the signature or authentication step; **across versions**: seed one account with choices recorded under the previous notice version, one accepted and one declined, change the printed text of one purpose and add another, and confirm on next login that the untouched choices carried over unasked, the changed and the new one are asked, and neither is acted on until answered; for every other collection point (import, API, inbound message) send one key it does not declare and see it rejected; raise an `arco` request from a throwaway account and read its folio and due date back in Mission Control, then raise one **with no account**, as a tenant's customer, and read back its folio, due date, tenant and the tenant admin it reached; run **every distinct deletion path** — one per kind of titular the inventory has, plus the tenant itself — and read back a `DeletionReceipt` for every place the inventory says that data is kept: gone from the app and from the bodega, a provider's acknowledgement where a request was needed, `not_deletable` only where the inventory and the notice already say so; the PR that published the notice names the lawyer who reviewed it |
+| 28 personal data | the notice describes the deployed app, consent is obeyed, and a request reaches a person | the inventory check green in CI against the **deployed** schema (`list_entity_schemas`), not the repo file: every deployed field classified, and every entity that holds personal data closed to client writes; every function with a non-empty `ingress` is the handler of a collection point listing the same data, and the reverse; **the served notices equal the generator's output** — regenerate the integral page and every simplified notice and diff the whole text against what `acaciaco-site` and the deployed app serve — and the notice version a new `ConsentRecord` carries equals the version printed on the served page; lint green on the one-door rule, and its test writes one undeclared key and one non-personal key carrying an email address and sees both throw; for **every** collection point the titular fills in, exercise its **optional** choices three ways — accept, decline, and accept then revoke — read back the `ConsentRecord` each time (right titular, current version, each choice as made) and confirm every function that acts on that choice skips the person who declined or revoked and still processes the one who accepted; for **every** purpose that decides about a person automatically, record one person's objection and confirm the function no longer applies the decision to them while it still does to others; where the point asks for financial or sensitive data, leave the **required** express consent unticked and confirm the submission is refused, nothing is stored and no record or downstream processing results, and for sensitive data confirm it cannot be given without the signature or authentication step; **across versions**: seed one account with choices recorded under the previous notice version, one accepted and one declined, change the printed text of one purpose and add another, and confirm on next login that the untouched choices carried over unasked, the changed and the new one are asked, and neither is acted on until answered; for every other collection point (import, API, inbound message) send one key it does not declare and see it rejected, and for each one the tenant's staff fill in, run it once with the attestation and once without and find, respectively, the attestation on the import's record or the notice sent to each person and logged; for each point that collects financial or sensitive data, give the express consent, revoke it, and confirm the function that used that data stops using it for that person; raise an `arco` request from a throwaway account and read its folio and due date back in Mission Control, then raise one **with no account**, as a tenant's customer, and read back its folio, due date, tenant and the tenant admin it reached; run **every distinct deletion path** — one per kind of titular the inventory has, plus the tenant itself — and read back a `DeletionReceipt` for every place the inventory says that data is kept: gone from the app and from the bodega, a provider's acknowledgement where a request was needed, `not_deletable` only where the inventory and the notice already say so; the PR that published the notice names the lawyer who reviewed it |
 
 ---
 

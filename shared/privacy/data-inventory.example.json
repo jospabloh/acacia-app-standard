@@ -11,7 +11,9 @@
         "record_authorship"
       ],
       "retention": "Mientras exista el registro",
-      "deletion": "Se vuelve anónimo al borrar la cuenta"
+      "deletion": "Se vuelve anónimo al borrar la cuenta",
+      "minors": false,
+      "acacia_role": "responsable"
     }
   },
   "titulares": {
@@ -260,7 +262,8 @@
       "purposes": [
         "fulfil_orders"
       ],
-      "notice": "tenant"
+      "notice": "tenant",
+      "notice_to_titular": "sent"
     },
     {
       "id": "support_form",

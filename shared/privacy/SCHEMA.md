@@ -24,7 +24,7 @@ the end, on purpose: do not close one by guessing.
 |---|---|
 | `notice_version` | an integer, incremented by hand when CI says the notice text changed |
 | `notice_hash` | hash of the generator's whole output (every notice, integral and simplified); CI recomputes it and fails if it differs, or if it differs from `main` while `notice_version` does not |
-| `platform_fields` | personal fields the platform adds to **every** entity, described once and in full: `created_by` is the email of the account that created the row. Each has `label`, `category`, `titular`, `purposes`, `retention`, `deletion` and `derived_from`. They apply to every entity, including those under `no_personal_data`, and the notice prints them once |
+| `platform_fields` | personal fields the platform adds to **every** entity, described once and in full: `created_by` is the email of the account that created the row. Each has `label`, `category`, `titular`, `minors`, `acacia_role`, `purposes`, `retention`, `deletion` and `derived_from`; these are its own and are never taken from the entity it sits on (`created_by` on a tenant's `Client` row is still an account user's email, with ACACIA as responsable). They apply to every entity, including those under `no_personal_data`, and the notice prints them once |
 | `titulares` | id → `label` |
 | `purposes` | id → `label`, `requires_consent`, optional `automated_decision` |
 | `recipients` | id → `label`, `role` (`encargado` \| `third_party`), `does`, `country`; a `third_party` also has `legal_basis`: the art. 36 fraction a lawyer confirmed, or `null`. Acceptance is required exactly when it is `null` |
@@ -59,7 +59,8 @@ store), `purposes` (ids, each one a purpose of what it collects), `notice`
 
 A simplified notice and a `ConsentRecord` exist where `filled_by` is
 `titular` or `representative`. A point filled in by staff or by a system
-serves no optional purpose. A point that collects a `sensitive` field has
+serves no optional purpose, and has `"notice_to_titular"`: `attested` or
+`sent` (Module 28, rule 3). A point that collects a `sensitive` field has
 `"authenticated": true` (a signed-in user, a confirmed code, or a signature);
 a `public_form` without it that collects one is an error.
 
@@ -93,8 +94,9 @@ An app's own `Session` entity (Module 20) is an entity, not this store;
    `derived_from`.
 3. Every collected field is collected by at least one point; no derived field
    is; a point's purposes are purposes of what it collects.
-4. Every entity under `entities` is closed to client writes in the deployed
-   schema.
+4. Every deployed entity is closed to client writes, the ones under
+   `no_personal_data` included: Module 3 already requires it of all of them,
+   and with `platform_fields` every row carries a person's email.
 5. The set of functions and router actions with non-empty `ingress` equals
    the set of handlers that collect an entity field, and each one's `ingress`
    equals the entity fields in its point's `collects` (`platform:auth`
@@ -105,7 +107,8 @@ An app's own `Session` entity (Module 20) is an entity, not this store;
    `written_by` there. `["platform"]` is exempt from both.
 6. Every function, and on a router every action, whose `acts_on` names a
    purpose with `requires_consent` or `automated_decision`, or a transfer to
-   a recipient with `legal_basis: null`, calls the consent helper. That the
+   a recipient with `legal_basis: null`, or that reads a field of category
+   `financial` or `sensitive`, calls the consent helper. That the
    handler then *obeys* the answer is not something a static check can see;
    the verification gate tests it at runtime, for optional purposes,
    transfers and objections to automated decisions alike.

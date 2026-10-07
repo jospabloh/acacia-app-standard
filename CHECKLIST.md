@@ -248,7 +248,8 @@ jospabloh/acacia-app-standard. Status:
       form of a tenant is published without that tenant's complete notice.
       Integral notice at `acaciaco-site/legal/privacidad/<slug>` and a
       simplified one at every form the titular fills in, both GENERATED and
-      diffed against what is served; `notice_version` moves when their text
+      diffed against what is served; people whose data the tenant's staff
+      entered get the notice by attestation or by message; `notice_version` moves when their text
       does. Consent is recorded per choice at every such form, keyed to the
       titular, and OBEYED: functions check it before acting on an optional
       purpose or a third-party transfer. Express consent for financial data;

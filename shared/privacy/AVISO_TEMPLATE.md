@@ -129,7 +129,9 @@ cómo desactivarlas.* [Cuáles, para qué, y cómo desactivarlas.]
 ### 11. Cambios a este aviso
 *Texto fijo.* Publicaremos la nueva versión en esta página con su fecha. Si
 tienes cuenta, al iniciar sesión te mostraremos qué cambió. Lo que ya habías
-aceptado o rechazado se conserva; solo te preguntaremos por lo nuevo.
+aceptado o rechazado se conserva mientras no cambie. Te volveremos a
+preguntar por una finalidad o una transferencia que sea nueva o cuya
+descripción haya cambiado, y no la aplicaremos hasta que respondas.
 
 ### 12. Si no quedas conforme
 Puedes acudir a la Secretaría Anticorrupción y Buen Gobierno, autoridad en

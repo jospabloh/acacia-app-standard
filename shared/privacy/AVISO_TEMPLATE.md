@@ -77,8 +77,11 @@ Proveedores que tratan datos por nuestra cuenta (encargados):
 función y qué datos recibe].
 
 Transferencias a terceros que no son encargados: [Ninguna / a quién y para
-qué]. ☐ Acepto ☐ No acepto esta transferencia. [Solo si existe alguna que
-requiera consentimiento.]
+qué — una línea por cada destinatario con `role: third_party` en el
+inventario]. Por cada una con `requires_acceptance: true`:
+☐ Acepto ☐ No acepto esta transferencia. La respuesta queda en el
+`ConsentRecord`. Las que tienen `legal_basis` se listan sin casilla,
+indicando que la ley permite hacerlas sin consentimiento.
 
 ### 7. Cuánto tiempo los conservamos
 [Por categoría: plazo y motivo. Qué se conserva por obligación fiscal u otra

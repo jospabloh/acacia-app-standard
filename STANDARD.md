@@ -1779,6 +1779,14 @@ schema. One entry per entity that holds personal data:
 ```json
 {
   "notice_version": "2026-10-07",
+  "material_hash": "sha256:…",
+  "recipients": {
+    "base44": { "role": "encargado", "purpose": "hosting and database", "country": "US" },
+    "mission-control-bodega": { "role": "encargado", "purpose": "ACACIA's own panel (Supabase)", "country": "US" },
+    "meta-whatsapp": { "role": "encargado", "purpose": "delivers messages the tenant sends", "country": "US" },
+    "insurer-x": { "role": "third_party", "purpose": "quotes a policy for the customer",
+                   "country": "MX", "legal_basis": null, "requires_acceptance": true }
+  },
   "entities": {
     "Client": {
       "titular": "tenant_customer",
@@ -1788,13 +1796,14 @@ schema. One entry per entity that holds personal data:
         "phone": { "category": "contact" },
         "rfc":   { "category": "fiscal" }
       },
+      "non_personal_fields": ["price_list_id", "credit_days", "active"],
       "minors": false,
       "purposes": [
         { "id": "fulfil_orders", "requires_consent": false },
         { "id": "marketing_whatsapp", "requires_consent": true }
       ],
       "source": "entered_by_tenant",
-      "recipients": ["base44", "mission-control-bodega", "meta-whatsapp"],
+      "recipients": ["base44", "mission-control-bodega", "meta-whatsapp", "insurer-x"],
       "retention": "while the tenant is active; fiscal fields for as long as tax law requires",
       "deletion": "anonymize name/phone/rfc, keep the transaction rows"
     },
@@ -1802,6 +1811,7 @@ schema. One entry per entity that holds personal data:
       "titular": "account_user",
       "acacia_role": "responsable",
       "fields": { "body": { "category": "identification" }, "attachments": { "category": "identification" } },
+      "non_personal_fields": ["ticket_id", "author_role"],
       "minors": false,
       "purposes": [{ "id": "support", "requires_consent": false }],
       "source": "entered_by_titular",
@@ -1810,7 +1820,10 @@ schema. One entry per entity that holds personal data:
       "deletion": "removed with the ticket"
     }
   },
-  "no_personal_data": ["Product", "Warehouse"],
+  "no_personal_data": {
+    "Product": ["name", "sku", "price", "stock"],
+    "Warehouse": ["name", "active"]
+  },
   "stores": {
     "auth_and_sessions": {
       "producers": ["functions/session/entry.ts"],
@@ -1866,12 +1879,40 @@ schema. One entry per entity that holds personal data:
 - A purpose that scores, profiles or decides about a person with no human in
   the loop carries `"automated_decision": true`. The titular can oppose that
   treatment (art. 26 II), so the app needs a way to switch it off per person.
-- `recipients`: every system the field reaches. **Mission Control's bodega is a
+- `recipients`: every system the data reaches, declared once at the top and
+  referenced by id from entities and stores. **Mission Control's bodega is a
   recipient** (Module 0 keeps a copy of operational data there), and so is any
-  LLM provider a feature sends the field to.
-- Every entity in the schema appears either under `entities` or in
-  `no_personal_data`. An entity in neither fails CI, so a new entity cannot
-  ship without someone deciding whether it holds personal data.
+  LLM provider a feature sends a field to. Each one has a `role`, because the
+  law treats the two differently: an `encargado` treats data on the
+  responsable's behalf and needs no acceptance (art. 2 XX); a `third_party`
+  receives a *transferencia*, and the notice must let the titular accept or
+  refuse it (art. 35) unless an exception of art. 36 applies. So a
+  `third_party` entry carries `purpose`, `legal_basis` (the art. 36 fraction a
+  lawyer confirmed, or `null`) and `requires_acceptance`, which is `true`
+  whenever `legal_basis` is `null`. The generator builds the notice's
+  provider list from the first kind and its accept/refuse clause from the
+  second, and a transfer that requires acceptance is a recorded choice in
+  `ConsentRecord` like any other. An id used anywhere and missing from this
+  registry fails CI.
+- **Every field of every entity is classified, not only every entity.** For
+  an entity under `entities`, `fields` (personal) and `non_personal_fields`
+  together must equal the entity's deployed fields. For an entity under
+  `no_personal_data`, the value is the list of its deployed fields, each one
+  thereby declared not personal. An entity in neither place fails CI, and so
+  does a field in neither list: adding `contact_email` to `Warehouse` turns
+  CI red until someone moves the entity or classifies the field. Platform
+  bookkeeping fields (`id`, `created_date`, `updated_date`) are exempt;
+  `created_by` is not — it is a user's email.
+- **A material change forces a new `notice_version`.** `material_hash` is a
+  hash CI computes over the parts of the file a titular would care about:
+  every purpose and its `requires_consent`, every recipient with its role and
+  legal basis,
+  every field's category, every `titular`, `minors` and `acacia_role`, and
+  the same keys inside `stores`. If the computed hash differs from the stored
+  one, CI fails until the hash is updated **and** `notice_version` is
+  different from the one on `main`. Rule 4 keys everything on that version,
+  so a new purpose or recipient cannot reach production under an old one and
+  slip past the people who accepted something else.
 - **Not all personal data lives in an entity.** `stores` covers the rest, and
   its six keys are fixed: `auth_and_sessions`, `files` (uploads and object
   storage), `logs` (function and request logs), `analytics`, `browser_storage`
@@ -1974,9 +2015,10 @@ collection, not only at signup**. Most titulares never sign up: a tenant's
 customer on a public order page, a visitor with a pass, a lead on a contact
 form. So the record is keyed to the titular — the user id when there is one,
 otherwise the record the form created (the `Client`, the `Lead`, the pass) —
-and a ticked box on any form leaves a row. When `notice_version` changes in a
-way that adds a purpose, a recipient or a data category, an account user sees
-the change on next login and the record is rewritten; for a titular with no
+and a ticked box on any form leaves a row. `notice_version` changes whenever
+the inventory changes materially (rule 1 makes CI enforce it), and when it
+does an account user sees the change on next login and the record is
+rewritten; for a titular with no
 login, the new purpose does not apply until they accept it at their next
 contact. Purposes with `requires_consent: true`
 (marketing, anything not needed to deliver the service) are separate,
@@ -2112,7 +2154,7 @@ Each module's proof is a thing you can run and read.
 | 25 signup finishes | a new email+password user can activate their account | `grep -rn verifyOtp src/` reachable from Register **and** Login, `resendOtp` called; then live with a throwaway `+` address: register, skip the code, log in — the code field appears, the code lands you in the app |
 | 26 function metadata | every function says what it is for, and nothing is deployed that nothing calls | `npm run lint` green with the metadata check; `base44 functions list` equals the directories with `function.meta.json`; every `cron:` trigger matches an **active** workflow in `GET /api/apps/{id}/workflows` |
 | 27 `mario_style` (optional) | if adopted: the app has the style and celebrates only finishing | `src/styles/mario_style.css` and `src/lib/celebrate.js` byte-identical to `shared/mario_style/` (`cmp`); every `celebrate(` call sits after an awaited write, outside `catch`; layout scanner **and** screenshots clean at 320/390/834/1440 in light and dark on the **deployed** bundle. N/A for apps that did not adopt it |
-| 28 personal data | the notice describes the deployed app, and a request reaches a person | the inventory check green in CI against the **deployed** schema (`list_entity_schemas`), not the repo file; for the six `stores`, the producer scan green (no call site that writes to a store outside the files `producers` names) and then, for **every** producer listed, one artifact it wrote read from the running app and matching what the file says it holds — every logging function's output, every upload path, every outbound integration, the browser's cookies and `localStorage` — not one sample per store; submit a public form with the optional box ticked, without an account, and find its `ConsentRecord`; every field named in the published notice exists in the inventory and the reverse; raise an `arco` ticket from a throwaway account and read the folio and due date back in Mission Control; delete a test customer and confirm the personal fields are gone from the app **and** from the bodega; the PR that published the notice names the lawyer who reviewed it |
+| 28 personal data | the notice describes the deployed app, and a request reaches a person | the inventory check green in CI against the **deployed** schema (`list_entity_schemas`), not the repo file — every deployed field classified, every recipient id in the registry with a role, `material_hash` current and `notice_version` ahead of `main` whenever it moved; for the six `stores`, the producer scan green (no call site that writes to a store outside the files `producers` names) and then, for **every** producer listed, one artifact it wrote read from the running app and matching what the file says it holds — every logging function's output, every upload path, every outbound integration, the browser's cookies and `localStorage` — not one sample per store; submit a public form with the optional box ticked, without an account, and find its `ConsentRecord`; every field named in the published notice exists in the inventory and the reverse; raise an `arco` ticket from a throwaway account and read the folio and due date back in Mission Control; delete a test customer and confirm the personal fields are gone from the app **and** from the bodega; the PR that published the notice names the lawyer who reviewed it |
 
 ---
 

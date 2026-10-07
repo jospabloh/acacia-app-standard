@@ -234,8 +234,11 @@ jospabloh/acacia-app-standard. Status:
 - [ ] Module 28 — Personal data: `privacy/data-inventory.json` lists every
       entity that holds a person's data (category, titular, whether minors,
       ACACIA's role, purposes with `requires_consent`, recipients including
-      Mission Control's bodega, retention, deletion) and CI fails on an entity
-      missing from it. The six non-entity `stores` (auth and sessions, files,
+      Mission Control's bodega, retention, deletion). CI fails on an entity or
+      a FIELD not classified as personal or not, on a recipient without a
+      declared role (encargado, or third_party with its legal basis and
+      whether the titular must accept), and on a material change that did
+      not bump `notice_version`. The six non-entity `stores` (auth and sessions, files,
       logs, analytics, browser storage, outbound messages) are each declared,
       empty or not, with every file that writes to it listed as a producer
       (CI scans for the write calls and fails on an unlisted one). Every

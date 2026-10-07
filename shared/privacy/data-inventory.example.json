@@ -1,5 +1,35 @@
 {
   "notice_version": "2026-10-07",
+  "material_hash": "sha256:<computed by the CI check>",
+  "recipients": {
+    "base44": {
+      "role": "encargado",
+      "purpose": "hosting and database",
+      "country": "US"
+    },
+    "mission-control-bodega": {
+      "role": "encargado",
+      "purpose": "ACACIA's own panel (Supabase)",
+      "country": "US"
+    },
+    "mercado-pago": {
+      "role": "encargado",
+      "purpose": "collects the subscription payment",
+      "country": "MX"
+    },
+    "meta-whatsapp": {
+      "role": "encargado",
+      "purpose": "delivers messages the tenant sends",
+      "country": "US"
+    },
+    "insurer-x": {
+      "role": "third_party",
+      "purpose": "quotes a policy for the customer",
+      "country": "MX",
+      "legal_basis": null,
+      "requires_acceptance": true
+    }
+  },
   "entities": {
     "User": {
       "titular": "account_user",
@@ -15,6 +45,10 @@
           "category": "contact"
         }
       },
+      "non_personal_fields": [
+        "role",
+        "tenant_id"
+      ],
       "minors": false,
       "purposes": [
         {
@@ -53,6 +87,11 @@
           "category": "fiscal"
         }
       },
+      "non_personal_fields": [
+        "price_list_id",
+        "credit_days",
+        "active"
+      ],
       "minors": false,
       "purposes": [
         {
@@ -68,7 +107,8 @@
       "recipients": [
         "base44",
         "mission-control-bodega",
-        "meta-whatsapp"
+        "meta-whatsapp",
+        "insurer-x"
       ],
       "retention": "while the tenant is active; fiscal fields for as long as tax law requires",
       "deletion": "anonymize name/phone/rfc, keep the transaction rows"
@@ -84,6 +124,10 @@
           "category": "identification"
         }
       },
+      "non_personal_fields": [
+        "ticket_id",
+        "author_role"
+      ],
       "minors": false,
       "purposes": [
         {
@@ -100,10 +144,18 @@
       "deletion": "removed with the ticket"
     }
   },
-  "no_personal_data": [
-    "Product",
-    "Warehouse"
-  ],
+  "no_personal_data": {
+    "Product": [
+      "name",
+      "sku",
+      "price",
+      "stock"
+    ],
+    "Warehouse": [
+      "name",
+      "active"
+    ]
+  },
   "stores": {
     "auth_and_sessions": {
       "producers": [

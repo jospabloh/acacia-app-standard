@@ -301,7 +301,10 @@ jospabloh/acacia-app-standard. Status:
       its author reference), deleting a tenant deletes EVERY testimonial of
       the tenant, each with its own ping, before the deletion completes. The BROWSER fires a secret-less, fire-and-forget
       `POST /api/ingest/testimonial-pull` `{app, testimonialId}` after submit
-      and after withdraw (`.catch(() => {})`); its response reveals nothing.
+      and after withdraw (`.catch(() => {})`) as an extra; the SERVER-side
+      withdraw/delete/member-removal functions call it themselves (3 s timeout,
+      up to 3 attempts with backoff) and return `delivered`; unknown ids answer
+      200 `{ok:true}`, Mission Control's transient failures 503.
       `acaciaControl` answers `testimonials.get {id}` -> `{ok, record|null,
       tenant_name}` and `testimonials.list {}` -> `{ok, records}` (full list,
       withdrawn included, no `since`), tenant id normalised to `tenant_id`, required
@@ -317,9 +320,8 @@ jospabloh/acacia-app-standard. Status:
       text is fixed and `consent_at` is the record. Proven on the deployed
       app: a test submission is `pending` in MC, approved, returned by
       `GET /api/testimonials`, then withdrawn, erased in the app and the bodega, and gone from the
-      public URL after the 60 s cache bound (`public, max-age=0,
-      must-revalidate, s-maxage=60`; request it again after
-      that time and confirm); a two-member tenant's deletion removes both rows from the app.
+      public URL at once (`Cache-Control: public, max-age=0,
+      must-revalidate`: no cache keeps a copy; request it again and confirm); a two-member tenant's deletion removes both rows from the app.
 
 Last audited against the standard: <date> — <what changed / what's still open>
 Last multi-tenant isolation audit: <date> — <scope, findings, what's unverified>

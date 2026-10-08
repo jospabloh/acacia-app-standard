@@ -2392,6 +2392,13 @@ withdrawn record the same shape holds with `"status": "withdrawn"` and
 - **Always the app's full list, `withdrawn` included.** There is no `since`:
   the volume is one row per user, and the full list is what lets Mission
   Control notice rows that were deleted.
+- **Every record carries `updated_date`: the app row's own last-write time,
+  required, ISO-8601 with `Z` or an offset** (Base44's built-in
+  `updated_date`; if the raw value has no zone, the bridge serialises it as UTC
+  with `Z`). It is the record's **version**: Mission Control stores it as
+  `source_updated_at` and compares it before every upsert and every
+  deletion-by-absence. The app's withdraw write bumps it like any other write,
+  so a withdrawal is always newer than the submission it retires.
 - **The bridge normalises the tenant's id to the field `tenant_id`**, whatever
   the entity calls it (`business_id`, `family_id`, `parish_id`…).
 - **It never returns an email or a user id.**
@@ -2405,7 +2412,9 @@ A `testimonials` table with its own review state **`pending | approved |
 rejected | withdrawn`**, upserted by `(app_id, external_id)`.
 
 **Validation on receipt is fail-closed.** A record is *publishable* only if
-`status === "submitted"`, `consent_publish === true`, `consent_at` is a
+`status === "submitted"`, `consent_publish === true`, `updated_date` is a
+valid version (same strict ISO-8601 rule; a *submitted* record without one is
+not publishable), `consent_at` is a
 strict ISO-8601 date or date-time (a date-time carries `Z` or an offset) naming
 a **real calendar day** (`2026-02-30` and `2026-13-01` are invalid; parsers
 that roll them over do not count), `rating` is a whole number 1–5 and the texts meet §1's limits. Any other
@@ -2416,12 +2425,18 @@ that roll them over do not count), `rating` is a whole number 1–5 and the text
 | publishable, no row yet | row `pending`, notify |
 | publishable, row `pending`, content changed | stays `pending`, row updated, no notification |
 | publishable, row `approved` or `rejected`, content changed | back to `pending`, notify |
-| publishable, row `withdrawn`, `consent_at` **later than** the withdrawal | `pending`, notify |
-| publishable, row `withdrawn`, `consent_at` not later than the withdrawal | nothing (a stale pre-withdrawal record, e.g. a sync list fetched just before the user withdrew or a delayed ping, never brings the erased text back) |
+| publishable, row `withdrawn`, `updated_date` **later than** the stored `source_updated_at` | `pending`, notify |
+| any record whose `updated_date` is older than or equal to the stored `source_updated_at` (submitted or withdrawn) | nothing: a stale list snapshot or a delayed ping never overwrites a newer write, restores erased text, or erases a newer resubmission |
 | publishable, unchanged | nothing |
-| withdrawn / invalid / no consent, row exists | row `withdrawn` **and the content is erased in the bodega** (`body`, `author_name`, `author_role` emptied, `consent_publish` false), recording `withdrawn_at` |
+| withdrawn / invalid / no consent, row exists | row `withdrawn` **and the content is erased in the bodega** (`body`, `author_name`, `author_role` emptied, `consent_publish` false), storing the record's `updated_date` when it has one |
 | withdrawn / invalid / no consent, no row | nothing is stored |
-| id no longer in the app (`record: null`, or absent from a `list` that answered correctly), row exists | treated as withdrawn |
+| id no longer in the app (`record: null`, or absent from a `list` that answered correctly), row exists | treated as withdrawn, **unless the row's `source_updated_at` is later than the instant the `get`/`list` call started** (the row arrived after that snapshot; the snapshot cannot speak for it) |
+
+**All Mission Control writes are compare-and-swap** on the row's `updated_at`
+(bumped by a trigger on every update). A write that matches 0 rows lost a race
+with another ingest or a withdrawal; Mission Control re-reads and re-decides
+once, and otherwise leaves the row for the next sync. An insert that hits the
+`(app_id, external_id)` unique constraint is the same lost race.
 
 **Erase-on-withdraw is how Module 28's deletion rule is met in the bodega** —
 "deletion reaches every place the inventory says the data is kept, including
@@ -2429,8 +2444,10 @@ Mission Control's bodega". Withdrawing in the app removes the personal data
 from the bodega as well (and, per §1, from the app's own row); nothing separate
 runs and nothing waits for a timer. A withdrawn record with empty text is a
 normal input, not an error: validation applies to *submitted* records, a
-withdrawn one is simply erased. The bodega stores `withdrawn_at` and restores a
-withdrawn row only for a record whose renewed `consent_at` is strictly later.
+withdrawn one is simply erased. Restoring a withdrawn row needs a
+record whose `updated_date` is strictly later than the stored version; the
+version rule above covers this case too, so there is no separate withdrawal
+timestamp.
 
 A notification is a row in `alerts` (`kind: 'testimonial'`) plus an email to
 `SUPPORT_ALERT_EMAILS`, **at most one per hour per testimonial**
@@ -2450,8 +2467,10 @@ through `audit()`.
 ### 6. Public endpoint and site
 
 `GET https://control.acaciaco.com.mx/api/testimonials` (optional
-`?app=<site slug>`): no authentication, CORS `*`, edge-cached for **at most 60
-seconds** (`Cache-Control: public, s-maxage=60`, **no** `stale-while-revalidate`,
+`?app=<site slug>`): no authentication, CORS `*`, cached for **at most 60
+seconds** at the edge and **not at all in browsers without revalidation**
+(`Cache-Control: public, max-age=0, s-maxage=60`; `s-maxage` alone leaves
+browsers free to apply heuristic freshness, and **no** `stale-while-revalidate`,
 which would keep serving the old body after expiry), **approved rows with
 consent only**. That bound is the longest a withdrawn or unpublished testimonial
 can still be served from the edge, and the module's promise is measured against
@@ -2465,8 +2484,11 @@ it:
 ```
 
 `app` is the **site's** slug (`puntos-plus`, not `puntos`); `month` is
-`YYYY-MM` of the approval in the **America/Mexico_City** time zone. Nothing
-else leaves: no email, no ids, no tenant name, no reviewer. It is **its own
+`YYYY-MM` of the approval in the **America/Mexico_City** time zone. The response
+covers **every** approved row (the query is paged past the API's 1000-row cap,
+the `?app=` filter runs in the query, order is newest approval first with an id
+tiebreak), so `items` are the newest 100 and `summary` counts all of them.
+Nothing else leaves: no email, no ids, no tenant name, no reviewer. It is **its own
 Mission Control function** for as long as it fits the plan's 12-function cap
 on `api/`.
 

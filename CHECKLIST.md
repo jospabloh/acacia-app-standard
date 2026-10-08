@@ -299,8 +299,9 @@ jospabloh/acacia-app-standard. Status:
       and after withdraw (`.catch(() => {})`); its response reveals nothing.
       `acaciaControl` answers `testimonials.get {id}` -> `{ok, record|null,
       tenant_name}` and `testimonials.list {}` -> `{ok, records}` (full list,
-      withdrawn included, no `since`), tenant id normalised to `tenant_id`, no
-      email or user id, signed per Module 15; an unimplemented action answers
+      withdrawn included, no `since`), tenant id normalised to `tenant_id`, required
+      `updated_date` on every record (ISO-8601 with Z/offset: the version
+      Mission Control compares before every upsert), no email or user id, signed per Module 15; an unimplemented action answers
       `unknown action: <action>`. Handlers live in an existing router, no new
       function (Module 11), listed in `function.meta.json`. Review state lives
       ONLY in Mission Control; the bodega erases the content on withdraw (that
@@ -311,7 +312,8 @@ jospabloh/acacia-app-standard. Status:
       text is fixed and `consent_at` is the record. Proven on the deployed
       app: a test submission is `pending` in MC, approved, returned by
       `GET /api/testimonials`, then withdrawn, erased in the app and the bodega, and gone from the
-      public URL after the 60 s edge-cache bound (request it again after
+      public URL after the 60 s cache bound (`public, max-age=0,
+      s-maxage=60`; request it again after
       that time and confirm); a two-member tenant's deletion removes both.
 
 Last audited against the standard: <date> — <what changed / what's still open>

@@ -276,6 +276,52 @@ jospabloh/acacia-app-standard. Status:
       state exists. Rejecting asks twice, raises a ticket and is carried out
       as a cancellation by the licence lifecycle; nothing is deleted by a
       timer. Ships observing; the date enforcement was turned on is below.
+- [ ] Module 29 — Testimonials (STANDARD.md §29 is the contract of record): a
+      third intent, "Dejar un testimonio", inside the existing Soporte screen.
+      Fields: `rating` whole 1-5, `body` 20-600 after trimming, `author_name`
+      1-80 (prefilled), `author_role` 0-80 (prefilled with the business),
+      and a required, UNTICKED `consent_publish` box with the exact text
+      "Autorizo a ACACIA a publicar este testimonio, con el nombre que indico,
+      en acaciaco.com.mx." plus "Se publica después de que ACACIA lo revise."
+      Entity `Testimonial`, tenant-isolated (Module 4), written ONLY through
+      the app's Safe function (Module 3) with server-set `consent_at`,
+      `status: submitted`, the author, tenant id and `app_version`; one row
+      per user (resubmitting replaces it and renews `consent_at`). App status
+      is only `submitted | withdrawn`; the UI says "Enviado" / "Retirado" and
+      never "publicado". Any authenticated member of a `trial` or `active`
+      tenant can submit; withdrawing is allowed in any billing state;
+      withdrawing sets `withdrawn` AND empties `body`, `author_name`,
+      `author_role` in the same write (the bridge never resends them);
+      the submit function reconciles after writing (oldest row of the
+      author in the tenant is canonical, extras deleted, pings for each);
+      the submit function re-reads user and tenant AFTER writing and deletes its
+      own row if the user left or the tenant is gone, deleting or not
+      `trial`/`active`, while the deletion paths mark first (clear the tenant
+      pointer / set the deletion state) and list second; removing a member (the admin's member-management function) and deleting an account DELETE that member's row (a withdrawn row keeps
+      its author reference), deleting a tenant deletes EVERY testimonial of
+      the tenant, each with its own ping, before the deletion completes. The BROWSER fires a secret-less, fire-and-forget
+      `POST /api/ingest/testimonial-pull` `{app, testimonialId}` after submit
+      and after withdraw (`.catch(() => {})`) as an extra; the SERVER-side
+      withdraw/delete/member-removal functions call it themselves (3 s timeout,
+      up to 3 attempts with backoff) and return `delivered`; unknown ids answer
+      200 `{ok:true}`, Mission Control's transient failures 503.
+      `acaciaControl` answers `testimonials.get {id}` -> `{ok, record|null,
+      tenant_name}` and `testimonials.list {}` -> `{ok, records}` (full list,
+      withdrawn included, no `since`), tenant id normalised to `tenant_id`, required
+      `updated_date` on every record (ISO-8601 with Z/offset: the version
+      Mission Control compares before every upsert), no email or user id, signed per Module 15; an unimplemented action answers
+      `unknown action: <action>`. Handlers live in an existing router, no new
+      function (Module 11), listed in `function.meta.json`. Review state lives
+      ONLY in Mission Control; the bodega erases the content on withdraw (that
+      is how Module 28's deletion rule is met there). Nobody seeds, edits or
+      invents a testimonial. The notice names publication of testimonials as
+      a consent-based purpose and `Testimonial` is in the data inventory with
+      retention BEFORE this ships (Module 28); no notice-version field, the
+      text is fixed and `consent_at` is the record. Proven on the deployed
+      app: a test submission is `pending` in MC, approved, returned by
+      `GET /api/testimonials`, then withdrawn, erased in the app and the bodega, and gone from the
+      public URL at once (`Cache-Control: public, max-age=0,
+      must-revalidate`: no cache keeps a copy; request it again and confirm); a two-member tenant's deletion removes both rows from the app.
 
 Last audited against the standard: <date> — <what changed / what's still open>
 Last multi-tenant isolation audit: <date> — <scope, findings, what's unverified>

@@ -2309,7 +2309,13 @@ row holds `rating`, `body`, `author_name`, `author_role`, `consent_publish`,
 - **One row per user.** Sending another testimonial **replaces the same row**
   and **renews `consent_at`**. It does not create a second one.
 - **The user can withdraw it** (`status: "withdrawn"`). The screen shows the
-  person their current testimonial and a "Retirar" action.
+  person their current testimonial and a "Retirar" action. **Withdrawing
+  erases the personal text in the app too:** the same write that sets
+  `status: "withdrawn"` also sets `body`, `author_name` and `author_role` to
+  empty strings (`rating`, tenant and dates stay). A withdrawn row therefore
+  holds no name and no words, and `testimonials.get` / `testimonials.list`
+  never resend them: every record on the bridge with `status: "withdrawn"`
+  carries empty `body`, `author_name` and `author_role`.
 - **The app never shows "published", "approved" or a star count from the
   site.** It shows **"Enviado"** and **"Retirado"**. Review state exists only
   in Mission Control, and the app has no way to know it.
@@ -2319,10 +2325,18 @@ is `trial` or `active`. A `view_only` or `suspended` tenant is refused by the
 Safe function (Module 3's gate), and the entry point says why instead of
 failing. **Withdrawing is allowed in any billing state.**
 
-**Deleting an account or a tenant** (Module 7's danger zone): the app first
-marks the person's testimonials `withdrawn` (or deletes the row), **then fires
-the ping**. A row left `submitted` for a tenant that no longer exists would
-stay published.
+**Deleting an account or a tenant** (Module 7's danger zone), **before the
+deletion completes**:
+- *Deleting a member's account:* the app withdraws that member's testimonial
+  (status and erase as above, or deletes the row) and pings for it.
+- *Deleting the tenant:* the app withdraws **every** `Testimonial` of that
+  tenant, whoever wrote it (erasing the personal fields), and fires the
+  ping **once per testimonial**, one `testimonialId` each. Withdrawing only
+  the deleting admin's row would leave the other members' approved testimonials
+  public under a tenant that no longer exists. The danger-zone flow does not
+  report the deletion as done until every withdrawal is written and every
+  ping has been sent (a failed ping is still only `.catch(() => {})`: the
+  daily sync is the backstop, but the writes are not optional).
 
 **No new backend function if an existing router can host the handler**
 (Module 11). The Safe write, the withdraw and the two bridge actions are
@@ -2365,7 +2379,9 @@ testimonial into the app.
   "tenant_name": "…" }
 ```
 
-and, if the id does not exist, `{ "ok": true, "record": null }`.
+and, if the id does not exist, `{ "ok": true, "record": null }`. For a
+withdrawn record the same shape holds with `"status": "withdrawn"` and
+`body`, `author_name` and `author_role` as empty strings.
 
 `testimonials.list` `{ }` →
 
@@ -2389,8 +2405,10 @@ A `testimonials` table with its own review state **`pending | approved |
 rejected | withdrawn`**, upserted by `(app_id, external_id)`.
 
 **Validation on receipt is fail-closed.** A record is *publishable* only if
-`status === "submitted"`, `consent_publish === true`, `consent_at` is a valid
-date, `rating` is a whole number 1–5 and the texts meet §1's limits. Any other
+`status === "submitted"`, `consent_publish === true`, `consent_at` is a
+strict ISO-8601 date or date-time (a date-time carries `Z` or an offset) naming
+a **real calendar day** (`2026-02-30` and `2026-13-01` are invalid; parsers
+that roll them over do not count), `rating` is a whole number 1–5 and the texts meet §1's limits. Any other
 `status`, missing consent or invalid record counts as **withdrawn**.
 
 | what arrives | what Mission Control does |
@@ -2398,16 +2416,21 @@ date, `rating` is a whole number 1–5 and the texts meet §1's limits. Any othe
 | publishable, no row yet | row `pending`, notify |
 | publishable, row `pending`, content changed | stays `pending`, row updated, no notification |
 | publishable, row `approved` or `rejected`, content changed | back to `pending`, notify |
-| publishable, row `withdrawn` | `pending`, notify |
+| publishable, row `withdrawn`, `consent_at` **later than** the withdrawal | `pending`, notify |
+| publishable, row `withdrawn`, `consent_at` not later than the withdrawal | nothing (a stale pre-withdrawal record, e.g. a sync list fetched just before the user withdrew or a delayed ping, never brings the erased text back) |
 | publishable, unchanged | nothing |
-| withdrawn / invalid / no consent, row exists | row `withdrawn` **and the content is erased in the bodega** (`body`, `author_name`, `author_role` emptied, `consent_publish` false) |
+| withdrawn / invalid / no consent, row exists | row `withdrawn` **and the content is erased in the bodega** (`body`, `author_name`, `author_role` emptied, `consent_publish` false), recording `withdrawn_at` |
 | withdrawn / invalid / no consent, no row | nothing is stored |
 | id no longer in the app (`record: null`, or absent from a `list` that answered correctly), row exists | treated as withdrawn |
 
 **Erase-on-withdraw is how Module 28's deletion rule is met in the bodega** —
 "deletion reaches every place the inventory says the data is kept, including
 Mission Control's bodega". Withdrawing in the app removes the personal data
-from the bodega as well; nothing separate runs and nothing waits for a timer.
+from the bodega as well (and, per §1, from the app's own row); nothing separate
+runs and nothing waits for a timer. A withdrawn record with empty text is a
+normal input, not an error: validation applies to *submitted* records, a
+withdrawn one is simply erased. The bodega stores `withdrawn_at` and restores a
+withdrawn row only for a record whose renewed `consent_at` is strictly later.
 
 A notification is a row in `alerts` (`kind: 'testimonial'`) plus an email to
 `SUPPORT_ALERT_EMAILS`, **at most one per hour per testimonial**
@@ -2427,8 +2450,12 @@ through `audit()`.
 ### 6. Public endpoint and site
 
 `GET https://control.acaciaco.com.mx/api/testimonials` (optional
-`?app=<site slug>`): no authentication, CORS `*`, edge-cached, **approved rows
-with consent only**:
+`?app=<site slug>`): no authentication, CORS `*`, edge-cached for **at most 60
+seconds** (`Cache-Control: public, s-maxage=60`, **no** `stale-while-revalidate`,
+which would keep serving the old body after expiry), **approved rows with
+consent only**. That bound is the longest a withdrawn or unpublished testimonial
+can still be served from the edge, and the module's promise is measured against
+it:
 
 ```json
 { "ok": true,
@@ -2462,8 +2489,9 @@ it. Therefore:
 - **No separate notice-version field in v1.** The consent text is fixed by this
   standard (§1), so `consent_at` is the record. If the text ever changes, this
   module changes with a new version and the question is reopened then.
-- Withdrawal (the app) and erase-on-withdraw (the bodega, §4) are how the
-  person takes their words back everywhere the inventory lists.
+- Withdrawal (the app erases its row, §1; the bodega erases its own, §4) and the
+  60-second public cache bound (§6) are how the person takes their words back
+  everywhere the inventory lists.
 
 ### What the app must not do
 
@@ -2532,7 +2560,7 @@ Each module's proof is a thing you can run and read.
 | 26 function metadata | every function says what it is for, and nothing is deployed that nothing calls | `npm run lint` green with the metadata check; `base44 functions list` equals the directories with `function.meta.json`; every `cron:` trigger matches an **active** workflow in `GET /api/apps/{id}/workflows` |
 | 27 `mario_style` (optional) | if adopted: the app has the style and celebrates only finishing | `src/styles/mario_style.css` and `src/lib/celebrate.js` byte-identical to `shared/mario_style/` (`cmp`); every `celebrate(` call sits after an awaited write, outside `catch`; layout scanner **and** screenshots clean at 320/390/834/1440 in light and dark on the **deployed** bundle. N/A for apps that did not adopt it |
 | 28 personal data | one notice describes every deployed app, consent is obeyed, and a request reaches a person | `acaciaco.com.mx/legal/privacidad` is served with a full address, the six items of art. 15 and a section for this app, and the PR that last changed it names the lawyer who read it; the app links to it from login, signup and About, and **every** form a person fills in themselves shows the simplified notice with its five parts, naming as sensitive any sensitive data that form asks for; the inventory check is green on the PR against the repo's entity files and green again against the **deployed** schema (`list_entity_schemas`) after the entities were deployed; read the app's section of the served notice against the inventory line by line — every kind of data, every kind of person, everything sensitive or about minors, **every use**, the ones that need no consent as much as the ones that do, every automated decision, every recipient, every retention period — and find nothing in one that is missing from the other; read the inventory's data outside entities against the running app (what sign-in holds, a session, a function log, an upload, the browser's storage, each provider's copy of a message) and find nothing there that the file omits; for **every** use that needs consent, decline it as one person and accept then revoke it as another, and confirm the function behind that use does nothing for either while it still acts for someone who accepted; at **every** form that asks for financial or sensitive data, withhold the express consent and confirm the form is refused and nothing is stored — and where a processor's hosted card field is involved, that the field is not in the page and no request has gone to the processor until the consent is recorded — then give it, revoke it, and confirm the function that used that data stops; where the data is sensitive, try to give that consent signed out and without the confirmed code or signature and confirm it is refused; where the person may be a minor, try the flow as the minor with no responsible adult and confirm it is refused; change how the notice describes one optional use and one third-party transfer that two test people had accepted, one with an account and one without, and confirm the first is shown the change at next login, the second is asked at their next form, neither use is acted on for either until answered again, and their other choices stand; raise an `arco` request from an account and another with no account, and read back for each its folio, its date to answer by and who it reached, then answer one in the person's favour and read back the separate date to act by; with no account, send an access, a rectification, a cancellation and an objection each twice, once with a valid identity document and once with someone else's, and confirm the first of each pair is carried out and the second releases nothing and changes nothing; read what the access request returned against the inventory and find every datum the app holds about that person, from every place it is kept, the bodega and the providers included; for **every** way the tenant's staff can enter people's data, a form or an import, run it and find either the tenant's statement that those people have its notice, recorded on that entry, or the notice sent to each of them and logged, and where a person has no usable contact confirm the tenant is told who received nothing; where such an entry carries financial or sensitive data, submit it without the tenant's statement about consent and confirm it is refused, then with it and find the statement stored; for **every** kind of person the app holds, carry one deletion and one rectification through and read back the record of what was done in each place the inventory lists, the bodega included; for **every** automated decision the app makes about people, record one person's objection and confirm the function stops applying it to them and still applies it to others; confirm **every** kind of data in the inventory has a retention period tied to an event, none open-ended, then for each period seed data older than it, run what enforces it, and read back the same record for each place that data was kept; for a multi-tenant app, take a tenant and blank its name, then its address, then its privacy contact, and find **every** one of its public forms unpublished each time; with all three filled, read the simplified notice each form serves and find the tenant named as responsable with that address, and follow its link to an integral notice that loads; and read the tenant terms as deployed and find each commitment of rule 3's data-processing clause: instructions only, confidentiality, security, providers named, help with ARCO, return or deletion on exit; open the app's `CLAUDE.md` and find the breach runbook of rule 9 complete: who decides, the message to send, where the record goes, and for a multi-tenant app that the tenant is told first; and for rule 10: try to create a tenant without accepting and get a refusal; call the deciding function as a staff user of a tenant and get a refusal, and again as the platform's `admin` naming that tenant and get a refusal; accept as a tenant admin and read back the row — version and hash equal to the served `legal/version.json`, who, server time — and the tenant's current state; try to write, update and delete such a row from the client and get three refusals; point the app at a manifest with a newer version and confirm the admin is asked again with `changes_es` shown, that the date of that first asking is recorded, that the earlier row is untouched, and that a staff user of the same tenant sees nothing and can still write; with enforcement on, move that date back past the grace period and confirm the admin cannot postpone while staff still write, then confirm a tenant with no such date is not held at all; reject, confirm on the second screen, and find the row, the ticket in Mission Control, and the tenant still working; accept afterwards and find both rows and a second ticket; reject again, set the tenant to `suspended`, and confirm accepting still works there while every other write is refused; make the acceptance write fail while a tenant is being created and find no tenant left behind; make the manifest unreachable and confirm nothing changes for a tenant that had decided or one that had not, that a decision attempted then is not recorded and the admin is told to retry and is let through even with the grace period over, and that creating a tenant fails the same way and leaves nothing behind |
-| 29 testimonials | a testimonial travels app → review → site only with consent, and can be taken back | on the **deployed** app, as a member of a `trial`/`active` tenant: submit a test testimonial without the box (refused, nothing stored), then with it, and read back the row — `status: submitted`, `consent_at` equal to the server's time and renewed by a second submission, the tenant's id, still one row; see it in Mission Control as `pending` within seconds (the ping), and the ping's response is `{ "ok": true }` for a real and for an unknown id; call `testimonials.get` and `testimonials.list` and compare the JSON to §3 field by field (tenant under `tenant_id`, `record: null` for an unknown id, withdrawn rows in the list, no email or user id), and an unimplemented action answers exactly `unknown action: <action>`; approve it and find it in `GET /api/testimonials` (`?app=<site slug>`) with exactly `app, rating, body, author_name, author_role, month` and nothing else; edit it in the app and find it `pending` again and gone from the public endpoint; reject it, edit it, and find it `pending`; withdraw it and find it `withdrawn` in Mission Control with `body`, `author_name` and `author_role` **empty in the bodega** and absent from the endpoint; with the ping blocked, submit another and find it in Mission Control after *Sincronizar ahora* (the `testimonials.list` backstop), then delete its row in the app and find it withdrawn and erased after the next sync; delete a test account or tenant and find its testimonial withdrawn or gone in the app and the bodega; from a `view_only` tenant a new submission is refused and a withdrawal is accepted; from a `suspended` tenant, and with another tenant's id or a forged `consent_at` in the body, the Safe function refuses or ignores them; a review sent with a stale `updated_at` answers 409; the UI says "Enviado"/"Retirado" and grep finds no client-side write to `Testimonial` and no "publicado"/"aprobado" text not read from Mission Control; `npm run validate:functions` green with no new `entry.*`; the served `legal/privacidad` names publication of testimonials as a consent-based purpose and `Testimonial` is in the inventory, **before** the feature was switched on. Withdraw every test row afterwards and confirm it is gone from the public endpoint |
+| 29 testimonials | a testimonial travels app → review → site only with consent, and can be taken back | on the **deployed** app, as a member of a `trial`/`active` tenant: submit a test testimonial without the box (refused, nothing stored), then with it, and read back the row — `status: submitted`, `consent_at` equal to the server's time and renewed by a second submission, the tenant's id, still one row; see it in Mission Control as `pending` within seconds (the ping), and the ping's response is `{ "ok": true }` for a real and for an unknown id; call `testimonials.get` and `testimonials.list` and compare the JSON to §3 field by field (tenant under `tenant_id`, `record: null` for an unknown id, withdrawn rows in the list, no email or user id), and an unimplemented action answers exactly `unknown action: <action>`; approve it and find it in `GET /api/testimonials` (`?app=<site slug>`) with exactly `app, rating, body, author_name, author_role, month` and nothing else; edit it in the app and find it `pending` again and gone from the public endpoint; reject it, edit it, and find it `pending`; withdraw it and find it `withdrawn` with `body`, `author_name` and `author_role` **empty in the app's own row, in the `testimonials.list` record and in the bodega**, and absent from the endpoint; with an **approved** testimonial already fetched through the public URL, withdraw it, wait the cache bound (60 s) and request the same public URL again: the item is gone from the response (a cached copy that still serves it fails the gate); with the ping blocked, submit another and find it in Mission Control after *Sincronizar ahora* (the `testimonials.list` backstop), then delete its row in the app and find it withdrawn and erased after the next sync; delete a test account and find its testimonial withdrawn or gone in the app and the bodega; delete a test tenant that has testimonials from **two or more members** (both approved) and find **every one** of them withdrawn and erased in the app and the bodega, and gone from the public endpoint after the cache bound, with one ping per testimonial sent before the deletion reported completion; from a `view_only` tenant a new submission is refused and a withdrawal is accepted; from a `suspended` tenant, and with another tenant's id or a forged `consent_at` in the body, the Safe function refuses or ignores them; a review sent with a stale `updated_at` answers 409; the UI says "Enviado"/"Retirado" and grep finds no client-side write to `Testimonial` and no "publicado"/"aprobado" text not read from Mission Control; `npm run validate:functions` green with no new `entry.*`; the served `legal/privacidad` names publication of testimonials as a consent-based purpose and `Testimonial` is in the inventory, **before** the feature was switched on. Withdraw every test row afterwards and confirm it is gone from the public endpoint |
 
 ---
 

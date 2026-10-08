@@ -290,8 +290,11 @@ jospabloh/acacia-app-standard. Status:
       is only `submitted | withdrawn`; the UI says "Enviado" / "Retirado" and
       never "publicado". Any authenticated member of a `trial` or `active`
       tenant can submit; withdrawing is allowed in any billing state;
-      deleting an account or tenant first marks it `withdrawn` (or deletes
-      the row) and pings. The BROWSER fires a secret-less, fire-and-forget
+      withdrawing sets `withdrawn` AND empties `body`, `author_name`,
+      `author_role` in the same write (the bridge never resends them);
+      deleting an account withdraws that member's row, deleting a tenant
+      withdraws EVERY testimonial of the tenant, each with its own ping,
+      before the deletion completes. The BROWSER fires a secret-less, fire-and-forget
       `POST /api/ingest/testimonial-pull` `{app, testimonialId}` after submit
       and after withdraw (`.catch(() => {})`); its response reveals nothing.
       `acaciaControl` answers `testimonials.get {id}` -> `{ok, record|null,
@@ -307,7 +310,9 @@ jospabloh/acacia-app-standard. Status:
       retention BEFORE this ships (Module 28); no notice-version field, the
       text is fixed and `consent_at` is the record. Proven on the deployed
       app: a test submission is `pending` in MC, approved, returned by
-      `GET /api/testimonials`, then withdrawn, erased in the bodega and gone.
+      `GET /api/testimonials`, then withdrawn, erased in the app and the bodega, and gone from the
+      public URL after the 60 s edge-cache bound (request it again after
+      that time and confirm); a two-member tenant's deletion removes both.
 
 Last audited against the standard: <date> — <what changed / what's still open>
 Last multi-tenant isolation audit: <date> — <scope, findings, what's unverified>

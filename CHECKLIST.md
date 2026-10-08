@@ -292,9 +292,11 @@ jospabloh/acacia-app-standard. Status:
       tenant can submit; withdrawing is allowed in any billing state;
       withdrawing sets `withdrawn` AND empties `body`, `author_name`,
       `author_role` in the same write (the bridge never resends them);
-      deleting an account withdraws that member's row, deleting a tenant
-      withdraws EVERY testimonial of the tenant, each with its own ping,
-      before the deletion completes. The BROWSER fires a secret-less, fire-and-forget
+      the submit function reconciles after writing (oldest row of the
+      author in the tenant is canonical, extras deleted, pings for each);
+      deleting an account DELETES that member's row (a withdrawn row keeps
+      its author reference), deleting a tenant deletes EVERY testimonial of
+      the tenant, each with its own ping, before the deletion completes. The BROWSER fires a secret-less, fire-and-forget
       `POST /api/ingest/testimonial-pull` `{app, testimonialId}` after submit
       and after withdraw (`.catch(() => {})`); its response reveals nothing.
       `acaciaControl` answers `testimonials.get {id}` -> `{ok, record|null,
@@ -313,8 +315,8 @@ jospabloh/acacia-app-standard. Status:
       app: a test submission is `pending` in MC, approved, returned by
       `GET /api/testimonials`, then withdrawn, erased in the app and the bodega, and gone from the
       public URL after the 60 s cache bound (`public, max-age=0,
-      s-maxage=60`; request it again after
-      that time and confirm); a two-member tenant's deletion removes both.
+      must-revalidate, s-maxage=60`; request it again after
+      that time and confirm); a two-member tenant's deletion removes both rows from the app.
 
 Last audited against the standard: <date> — <what changed / what's still open>
 Last multi-tenant isolation audit: <date> — <scope, findings, what's unverified>

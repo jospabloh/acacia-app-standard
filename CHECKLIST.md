@@ -294,7 +294,7 @@ jospabloh/acacia-app-standard. Status:
       `author_role` in the same write (the bridge never resends them);
       the submit function reconciles after writing (oldest row of the
       author in the tenant is canonical, extras deleted, pings for each);
-      deleting an account DELETES that member's row (a withdrawn row keeps
+      removing a member (the admin's member-management function) and deleting an account DELETE that member's row (a withdrawn row keeps
       its author reference), deleting a tenant deletes EVERY testimonial of
       the tenant, each with its own ping, before the deletion completes. The BROWSER fires a secret-less, fire-and-forget
       `POST /api/ingest/testimonial-pull` `{app, testimonialId}` after submit
